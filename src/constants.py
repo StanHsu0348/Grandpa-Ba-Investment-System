@@ -84,7 +84,7 @@ COVERAGE_AUTO_ITEMS = 3
 # ---------------------------------------------------------------------------
 DEFAULT_ROE_THRESHOLD_US = 15.0        # 原則① ROE 門檻（%），與台股課程門檻一致
 DEFAULT_PAYOUT_THRESHOLD_US = 40.0     # 原則② 配息率門檻（%）
-# 原則④ 淨利門檻：改用課程 cht14 P40 附錄「稅前淨利國際級 > USD 75M」延伸判準
+# 原則④ 淨利門檻：改用課程附錄「稅前淨利國際級 > USD 75M」延伸判準
 # （單位：百萬美元，美股體質差異極大，不沿用台股 5億元台幣的門檻數字）
 DEFAULT_NET_INCOME_THRESHOLD_US = 75.0
 DEFAULT_IRR_THRESHOLD_US = 15.0        # 延伸判準：合理買價報酬率 IRR 門檻（%）
