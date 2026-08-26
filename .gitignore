@@ -1,0 +1,22 @@
+# === 機敏資料：絕對不可進 git ===
+# Streamlit 登入帳密
+.streamlit/secrets.toml
+# stocks.ddns.net 登入 session cookies（等同帳號密碼！）
+scripts/stocks_download/auth_state.json
+# 已登入頁面的 HTML dump（含使用者名稱、頁面結構）
+scripts/stocks_download/downloadlist_dump.html
+# 下載紀錄（含本機絕對路徑）
+scripts/stocks_download/download_log.txt
+scripts/stocks_download/button_labels.txt
+
+# 付費訂閱資料（data/*.xlsx、data/history/）故意「不」排除，
+# 因為要靠 git push 自動同步到 Streamlit Community Cloud（private repo，只有自己看得到）。
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db

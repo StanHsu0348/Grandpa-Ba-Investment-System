@@ -1,0 +1,274 @@
+# -*- coding: utf-8 -*-
+"""
+美股（uslist.xlsx）SECTOR 欄位的中文翻譯與大分類對照表。
+
+uslist.xlsx 的 SECTOR 欄位混合了多種分類系統的用詞（部分公司用簡短的
+GICS 風格分類，部分公司—尤其是 OTC／海外掛牌者—用較細的 SIC 風格分類），
+共約 200 種不同字串，對不熟悉英文財經術語的使用者來說很難直接勾選。
+
+這裡提供兩層對照：
+1. `US_SECTOR_INFO`：每個原始 SECTOR 字串 -> (中文翻譯, 所屬大分類代碼)
+2. `US_SECTOR_GROUPS`：大分類代碼 -> (英文名稱, 中文名稱)，大分類參考 GICS
+   11 大類的精神（科技／醫療保健／金融／消費…），方便使用者先選大分類，
+   再從縮小後的細分產業清單中挑選，不用一次面對 200 多個英文選項。
+
+若未來 uslist.xlsx 出現新的 SECTOR 字串，`group_of()` 會回退為 "other"
+（其他／綜合），不會噴錯，但建議之後補上正式翻譯與分類。
+"""
+from __future__ import annotations
+
+# ---------------------------------------------------------------------------
+# 大分類（順序即為 UI 呈現順序）
+# ---------------------------------------------------------------------------
+US_SECTOR_GROUPS = {
+    "tech": ("Technology", "科技"),
+    "healthcare": ("Healthcare", "醫療保健"),
+    "financials": ("Financials", "金融"),
+    "consumer_cyclical": ("Consumer Cyclical", "非必需消費"),
+    "consumer_defensive": ("Consumer Defensive", "必需消費"),
+    "industrials": ("Industrials", "工業"),
+    "energy": ("Energy", "能源"),
+    "materials": ("Basic Materials", "原物料"),
+    "utilities": ("Utilities", "公用事業"),
+    "real_estate": ("Real Estate", "房地產"),
+    "communication": ("Communication Services", "通訊服務"),
+    "other": ("Other / Diversified", "其他／綜合"),
+}
+
+# ---------------------------------------------------------------------------
+# 個別 SECTOR -> (中文翻譯, 大分類代碼)
+# ---------------------------------------------------------------------------
+US_SECTOR_INFO: dict[str, tuple[str, str]] = {
+    "Abrasive, Asbestos, And Miscellaneous Nonmetallic Mineral Products": ("研磨材料、石綿及其他非金屬礦產品", "materials"),
+    "Advertising Agencies": ("廣告代理", "communication"),
+    "Aerospace & Defense": ("航太與國防", "industrials"),
+    "Agricultural Inputs": ("農業投入品（肥料、種子）", "materials"),
+    "Agriculture Production Livestock and Animal Specialties": ("農牧生產（畜牧與特用動物）", "consumer_defensive"),
+    "Airlines": ("航空公司", "industrials"),
+    "Airports & Air Services": ("機場與航空服務", "industrials"),
+    "Apparel Manufacturing": ("服飾製造", "consumer_cyclical"),
+    "Apparel Retail": ("服飾零售", "consumer_cyclical"),
+    "Asset Management": ("資產管理", "financials"),
+    "Auto & Truck Dealerships": ("汽車與卡車經銷", "consumer_cyclical"),
+    "Auto Manufacturers": ("汽車製造", "consumer_cyclical"),
+    "Auto Parts": ("汽車零組件", "consumer_cyclical"),
+    "Banks - Diversified": ("銀行－綜合型", "financials"),
+    "Banks - Regional": ("銀行－區域型", "financials"),
+    "Basic Materials": ("原物料（綜合）", "materials"),
+    "Beverages - Brewers": ("飲料－啤酒", "consumer_defensive"),
+    "Beverages - Non-Alcoholic": ("飲料－無酒精", "consumer_defensive"),
+    "Beverages - Wineries & Distilleries": ("飲料－酒莊與釀酒", "consumer_defensive"),
+    "Biotechnology": ("生物科技", "healthcare"),
+    "Broadcasting": ("廣播媒體", "communication"),
+    "Building Materials": ("建材", "materials"),
+    "Building Products & Equipment": ("建築產品與設備", "industrials"),
+    "Business Equipment & Supplies": ("商用設備與用品", "industrials"),
+    "Business Services, not elsewhere classified": ("商業服務（未分類）", "industrials"),
+    "Capital Markets": ("資本市場", "financials"),
+    "Chemicals": ("化學", "materials"),
+    "Coking Coal": ("煉焦煤", "energy"),
+    "Commercial Banks": ("商業銀行", "financials"),
+    "Commercial Services": ("商業服務", "industrials"),
+    "Communication Equipment": ("通訊設備", "tech"),
+    "Communication Services": ("通訊服務（綜合）", "communication"),
+    "Communications": ("通訊業", "communication"),
+    "Computer Hardware": ("電腦硬體", "tech"),
+    "Computer Programming, Data Processing, And Other Computer Related Services": ("電腦程式設計、資料處理及其他電腦相關服務", "tech"),
+    "Confectioners": ("糖果零食", "consumer_defensive"),
+    "Conglomerates": ("綜合企業", "other"),
+    "Construction, Mining, And Materials Handling": ("營建、採礦與物料搬運機械", "industrials"),
+    "Consulting Services": ("顧問服務", "industrials"),
+    "Consumer Cyclical": ("非必需消費（綜合）", "consumer_cyclical"),
+    "Consumer Defensive": ("必需消費（綜合）", "consumer_defensive"),
+    "Consumer Durables": ("消費耐久財", "consumer_cyclical"),
+    "Consumer Electronics": ("消費電子", "consumer_cyclical"),
+    "Consumer Non-Durables": ("消費非耐久財", "consumer_defensive"),
+    "Consumer Services": ("消費服務", "consumer_cyclical"),
+    "Copper": ("銅", "materials"),
+    "Credit Services": ("信用服務（消費金融）", "financials"),
+    "Department Stores": ("百貨公司", "consumer_cyclical"),
+    "Diagnostics & Research": ("診斷與研究服務", "healthcare"),
+    "Distribution Services": ("批發配銷服務", "industrials"),
+    "Drug Manufacturers - General": ("製藥－一般大廠", "healthcare"),
+    "Drug Manufacturers - Specialty & Generic": ("製藥－專科與學名藥", "healthcare"),
+    "Education & Training Services": ("教育與訓練服務", "consumer_cyclical"),
+    "Electrical Equipment & Parts": ("電機設備與零件", "industrials"),
+    "Electromedical and Electrotherapeutic Apparatus": ("電子醫療與電療器材", "healthcare"),
+    "Electronic Components": ("電子零組件", "tech"),
+    "Electronic Gaming & Multimedia": ("電子遊戲與多媒體", "communication"),
+    "Electronic Technology": ("電子科技（綜合）", "tech"),
+    "Electronics & Computer Distribution": ("電子與電腦產品配銷", "tech"),
+    "Energy": ("能源（綜合）", "energy"),
+    "Energy Minerals": ("能源礦產（石油與天然氣）", "energy"),
+    "Engineering & Construction": ("工程與營建", "industrials"),
+    "Entertainment": ("娛樂事業", "communication"),
+    "Farm & Heavy Construction Machinery": ("農業與重型營建機械", "industrials"),
+    "Farm Products": ("農產品", "consumer_defensive"),
+    "Finance": ("金融業（綜合）", "financials"),
+    "Financial": ("金融（綜合）", "financials"),
+    "Financial Conglomerates": ("綜合金融集團", "financials"),
+    "Financial Data & Stock Exchanges": ("金融資訊與證券交易所", "financials"),
+    "Financial Services": ("金融服務", "financials"),
+    "Fire, Marine, and Casualty Insurance": ("火險、海上與意外保險", "financials"),
+    "Food Distribution": ("食品配銷", "consumer_defensive"),
+    "Footwear & Accessories": ("鞋類與配件", "consumer_cyclical"),
+    "Furnishings, Fixtures & Appliances": ("家具、裝置與家電", "consumer_cyclical"),
+    "Gambling": ("博弈產業", "consumer_cyclical"),
+    "Gold": ("黃金", "materials"),
+    "Gold And Silver Ores": ("金銀礦", "materials"),
+    "Grocery Stores": ("雜貨零售", "consumer_defensive"),
+    "Hardware, Equipment & Parts": ("硬體設備與零件", "tech"),
+    "Health Information Services": ("醫療資訊服務", "healthcare"),
+    "Health Services": ("醫療服務", "healthcare"),
+    "Health Technology": ("醫療科技", "healthcare"),
+    "Healthcare": ("醫療保健（綜合）", "healthcare"),
+    "Home Improvement Retail": ("居家修繕零售", "consumer_cyclical"),
+    "Household & Personal Products": ("家用與個人用品", "consumer_defensive"),
+    "Industrial Distribution": ("工業配銷", "industrials"),
+    "Industrial Services": ("工業服務", "industrials"),
+    "Industrials": ("工業（綜合）", "industrials"),
+    "Information Technology Services": ("資訊科技服務", "tech"),
+    "Infrastructure Operations": ("基礎建設營運", "industrials"),
+    "Insurance - Diversified": ("保險－綜合型", "financials"),
+    "Insurance - Life": ("保險－壽險", "financials"),
+    "Insurance - Property & Casualty": ("保險－產物險", "financials"),
+    "Insurance - Reinsurance": ("保險－再保險", "financials"),
+    "Insurance - Specialty": ("保險－特殊險種", "financials"),
+    "Insurance Brokers": ("保險經紀", "financials"),
+    "Insurance Carriers": ("保險公司", "financials"),
+    "Integrated Freight & Logistics": ("整合型貨運與物流", "industrials"),
+    "Internet Content & Information": ("網路內容與資訊服務", "communication"),
+    "Internet Retail": ("網路零售（電商）", "consumer_cyclical"),
+    "Jewelry, Watches, Precious Stones, and Precious Metals": ("珠寶、手錶、寶石與貴金屬", "consumer_cyclical"),
+    "Leisure": ("休閒娛樂", "consumer_cyclical"),
+    "Local and Suburban Transit and Interurban Highway Passenger Transportation": ("市區與城郊大眾運輸、城際公路客運", "industrials"),
+    "Lodging": ("住宿業", "consumer_cyclical"),
+    "Lumber & Wood Production": ("木材與木製品生產", "materials"),
+    "Luxury Goods": ("精品／奢侈品", "consumer_cyclical"),
+    "Machinery, Equipment, And Supplies": ("機械、設備與用品", "industrials"),
+    "Management Investment Offices, Open-End": ("開放式投資管理公司", "financials"),
+    "Marine Shipping": ("海運", "industrials"),
+    "Medical Care Facilities": ("醫療照護機構", "healthcare"),
+    "Medical Devices": ("醫療器材", "healthcare"),
+    "Medical Distribution": ("醫療用品配銷", "healthcare"),
+    "Medical Instruments & Supplies": ("醫療儀器與用品", "healthcare"),
+    "Medical, Dental, and Hospital Equipment and Supplies": ("醫療、牙科與醫院設備用品", "healthcare"),
+    "Metal Fabrication": ("金屬加工", "industrials"),
+    "Metal Mining": ("金屬採礦", "materials"),
+    "Mining and Quarrying Of Nonmetallic Minerals, except Fuels": ("非金屬礦物採礦（不含燃料）", "materials"),
+    "Miscellaneous": ("其他／未分類", "other"),
+    "Miscellaneous Business Services": ("其他商業服務", "industrials"),
+    "Miscellaneous Chemical Products": ("其他化學製品", "materials"),
+    "Miscellaneous Fabricated Metal Products": ("其他金屬加工製品", "materials"),
+    "Miscellaneous Shopping Goods Stores": ("其他一般商品零售", "consumer_cyclical"),
+    "Mortgage Finance": ("房貸金融", "financials"),
+    "Non-Energy Minerals": ("非能源礦產（綜合）", "materials"),
+    "Non-operating Establishments": ("非營運機構", "other"),
+    "Oil & Gas Drilling": ("石油與天然氣鑽探", "energy"),
+    "Oil & Gas Equipment & Services": ("石油與天然氣設備服務", "energy"),
+    "Oil & Gas Exploration & Production": ("石油與天然氣探勘生產", "energy"),
+    "Oil & Gas Integrated": ("石油與天然氣（整合型）", "energy"),
+    "Oil & Gas Midstream": ("石油與天然氣中游", "energy"),
+    "Oil & Gas Refining & Marketing": ("石油與天然氣煉製行銷", "energy"),
+    "Oil and Gas Field Services, not elsewhere classified": ("油氣田服務（未分類）", "energy"),
+    "Other": ("其他", "other"),
+    "Other Industrial Metals & Mining": ("其他工業金屬與採礦", "materials"),
+    "Other Precious Metals & Mining": ("其他貴金屬與採礦", "materials"),
+    "Packaged Foods": ("包裝食品", "consumer_defensive"),
+    "Packaging & Containers": ("包裝與容器", "materials"),
+    "Paper & Paper Products": ("紙業與紙製品", "materials"),
+    "Perfumes, Cosmetics, and Other Toilet Preparations": ("香水、化妝品與盥洗用品", "consumer_defensive"),
+    "Personal Services": ("個人服務", "consumer_cyclical"),
+    "Pharmaceutical Preparations": ("醫藥製劑", "healthcare"),
+    "Pharmaceutical Retailers": ("藥局零售", "consumer_defensive"),
+    "Plastics Materials, Synthetic Resins, and Nonvulcanizable Elastomers": ("塑膠原料、合成樹脂與不可硫化彈性體", "materials"),
+    "Pollution & Treatment Controls": ("污染防治設備", "industrials"),
+    "Prepackaged Software": ("套裝軟體", "tech"),
+    "Process Industries": ("加工製造業（綜合）", "materials"),
+    "Producer Manufacturing": ("生產性製造業", "industrials"),
+    "Publishing": ("出版業", "communication"),
+    "REIT - Diversified": ("不動產信託－綜合型", "real_estate"),
+    "REIT - Healthcare Facilities": ("不動產信託－醫療設施", "real_estate"),
+    "REIT - Hotel & Motel": ("不動產信託－旅館", "real_estate"),
+    "REIT - Industrial": ("不動產信託－工業廠房", "real_estate"),
+    "REIT - Mortgage": ("不動產信託－房貸型", "real_estate"),
+    "REIT - Office": ("不動產信託－辦公大樓", "real_estate"),
+    "REIT - Residential": ("不動產信託－住宅", "real_estate"),
+    "REIT - Retail": ("不動產信託－零售商場", "real_estate"),
+    "Railroads": ("鐵路運輸", "industrials"),
+    "Real Estate": ("房地產（綜合）", "real_estate"),
+    "Real Estate - Development": ("房地產開發", "real_estate"),
+    "Real Estate - Diversified": ("房地產－綜合型", "real_estate"),
+    "Real Estate Investment Trusts": ("不動產投資信託（REITs）", "real_estate"),
+    "Real Estate Services": ("房地產服務", "real_estate"),
+    "Recreational Vehicles": ("休閒車輛", "consumer_cyclical"),
+    "Rental & Leasing Services": ("租賃服務", "industrials"),
+    "Residential Construction": ("住宅營建", "consumer_cyclical"),
+    "Resorts & Casinos": ("度假村與賭場", "consumer_cyclical"),
+    "Restaurants": ("餐飲業", "consumer_cyclical"),
+    "Retail Trade": ("零售業（綜合）", "consumer_cyclical"),
+    "Scientific & Technical Instruments": ("科學與技術儀器", "tech"),
+    "Security & Protection Services": ("保全與防護服務", "industrials"),
+    "Semiconductor Equipment & Materials": ("半導體設備與材料", "tech"),
+    "Semiconductors": ("半導體", "tech"),
+    "Shell Companies": ("空殼公司", "other"),
+    "Silver": ("銀", "materials"),
+    "Software - Application": ("軟體－應用", "tech"),
+    "Software - Infrastructure": ("軟體－基礎架構", "tech"),
+    "Solar": ("太陽能", "utilities"),
+    "Specialty Business Services": ("特殊商業服務", "industrials"),
+    "Specialty Chemicals": ("特用化學品", "materials"),
+    "Specialty Industrial Machinery": ("特殊工業機械", "industrials"),
+    "Specialty Retail": ("特殊零售", "consumer_cyclical"),
+    "Staffing & Employment Services": ("人力派遣與就業服務", "industrials"),
+    "Steel": ("鋼鐵", "materials"),
+    "Sugar And Confectionery Products": ("糖與糖果製品", "consumer_defensive"),
+    "Technology": ("科技（綜合）", "tech"),
+    "Technology Services": ("科技服務", "tech"),
+    "Telecom Services": ("電信服務", "communication"),
+    "Telephone Communications, Except Radiotelephone": ("電話通訊（不含無線電話）", "communication"),
+    "Textile Manufacturing": ("紡織製造", "consumer_cyclical"),
+    "Thermal Coal": ("動力煤", "energy"),
+    "Tobacco": ("菸草", "consumer_defensive"),
+    "Tobacco Products": ("菸草製品", "consumer_defensive"),
+    "Tools & Accessories": ("工具與配件", "industrials"),
+    "Totalizing Fluid Meters and Counting Devices": ("液體計量與計數裝置", "industrials"),
+    "Transportation": ("運輸業（綜合）", "industrials"),
+    "Travel Lodging": ("旅遊住宿", "consumer_cyclical"),
+    "Travel Services": ("旅遊服務", "consumer_cyclical"),
+    "Trucking": ("卡車貨運", "industrials"),
+    "Uranium": ("鈾", "energy"),
+    "Utilities": ("公用事業（綜合）", "utilities"),
+    "Utilities - Diversified": ("公用事業－綜合型", "utilities"),
+    "Utilities - Independent Power Producers": ("公用事業－獨立發電業者", "utilities"),
+    "Utilities - Regulated Electric": ("公用事業－受管制電力", "utilities"),
+    "Utilities - Regulated Gas": ("公用事業－受管制燃氣", "utilities"),
+    "Utilities - Regulated Water": ("公用事業－受管制水務", "utilities"),
+    "Utilities - Renewable": ("公用事業－再生能源", "utilities"),
+    "Video Tape Rental": ("錄影帶租賃", "communication"),
+    "Waste Management": ("廢棄物管理", "industrials"),
+}
+
+
+def translate(sector: str) -> str:
+    """回傳 SECTOR 的中文翻譯，找不到對照時原樣回傳英文字串。"""
+    info = US_SECTOR_INFO.get(sector)
+    return info[0] if info else sector
+
+
+def group_of(sector: str) -> str:
+    """回傳 SECTOR 所屬的大分類代碼，找不到對照時歸類為 "other"。"""
+    info = US_SECTOR_INFO.get(sector)
+    return info[1] if info else "other"
+
+
+def format_sector_option(sector: str) -> str:
+    """細分產業 multiselect 用的顯示文字：中文（English）。"""
+    info = US_SECTOR_INFO.get(sector)
+    return f"{info[0]}（{sector}）" if info else sector
+
+
+def format_group_option(group_key: str) -> str:
+    """大分類 multiselect 用的顯示文字：中文 English。"""
+    en, zh = US_SECTOR_GROUPS.get(group_key, (group_key, group_key))
+    return f"{zh} {en}"
