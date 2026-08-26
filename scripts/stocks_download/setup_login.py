@@ -56,7 +56,7 @@ def main() -> None:
 
         page.wait_for_load_state("networkidle")
 
-        if "Login.aspx" in page.url:
+        if "login.aspx" in page.url.lower():
             print("看起來還沒登入成功（被導回登入頁了），請重新執行本程式再試一次。")
             browser.close()
             sys.exit(1)

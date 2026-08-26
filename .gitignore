@@ -1,4 +1,6 @@
 # === 機敏資料：絕對不可進 git ===
+# 操作手冊（含帳號密碼）
+SOP.md
 # Streamlit 登入帳密
 .streamlit/secrets.toml
 # stocks.ddns.net 登入 session cookies（等同帳號密碼！）

@@ -100,7 +100,7 @@ def main() -> int:
         page = context.new_page()
         page.goto(DOWNLOAD_URL, wait_until="networkidle")
 
-        if "Login.aspx" in page.url:
+        if "login.aspx" in page.url.lower():
             log("Session 已過期（被導回登入頁），請重新執行 setup_login.py 手動登入一次。")
             browser.close()
             return 1
