@@ -34,8 +34,8 @@ from src.constants import (
 )
 from src.data_loader import DataLoadError, get_data_date, load_us_data
 from src.scoring import compute_coverage_score, compute_roe_stability
-from src.screener import ROE_MODE_LABELS, ROE_MODES, apply_all_filters, roe_pass_mask, valuation_labels
-from src.ui_helpers import expand_roe_trend_column, synced_slider
+from src.screener import apply_all_filters, filter_by_roe, valuation_labels
+from src.ui_helpers import synced_slider
 from src.us_sector_i18n import (
     US_SECTOR_GROUPS,
     format_group_option,
@@ -76,9 +76,7 @@ def _to_excel_bytes(table: pd.DataFrame) -> bytes:
     對上萬列資料的寫入成本不小（實測美股 12,497 列約 2 秒），
     不快取的話等於每次調整任何篩選條件都要白白付這筆成本。
     快取鍵是 table 本身的內容雜湊，篩選結果不變時直接吃快取。
-
-    傳入的 table 應該已經是 expand_roe_trend_column() 展開過的版本
-    （欄位皆為可直接寫入 Excel 的純量值），呼叫端負責展開，這裡只管寫檔。
+    傳入的 table 需為欄位皆為純量值的版本（可直接寫入 Excel）。
     """
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
@@ -88,7 +86,6 @@ def _to_excel_bytes(table: pd.DataFrame) -> bytes:
 
 def init_session_defaults():
     defaults = {
-        "us_roe_modes": [],
         "us_roe_threshold_slider": 0.0,
         "us_roe_threshold_input": 0.0,
         "us_payout_threshold_slider": 0.0,
@@ -115,9 +112,6 @@ def clear_all_filters(all_sectors, all_currencies):
     再修改其對應的 session_state key。因此這個函式必須在任何側邊欄
     widget 建立「之前」呼叫（見下方 `_us_clear_filters_pending` 的處理方式）。
     """
-    st.session_state["us_roe_modes"] = []
-    for mode in ROE_MODES:
-        st.session_state[f"us_roe_mode_{mode}"] = False
     st.session_state["us_roe_threshold_slider"] = 0.0
     st.session_state["us_roe_threshold_input"] = 0.0
     st.session_state["us_payout_threshold_slider"] = 0.0
@@ -301,22 +295,13 @@ st.sidebar.divider()
 # 側邊欄：① ROE 穩定度篩選
 # ---------------------------------------------------------------------------
 st.sidebar.header("① ROE 穩定度篩選")
-st.sidebar.caption(f"勾選一種或多種模式並列比較，未勾選的模式不會套用篩選。（課程門檻參考值：{DEFAULT_ROE_THRESHOLD_US:.0f}%）")
+st.sidebar.caption(
+    f"近5年（ROE1~ROE5 實際歷史值，非預期ROE）任一年低於門檻就排除，"
+    f"缺值視為不通過。門檻設為 0 代表不限。（課程門檻參考值：{DEFAULT_ROE_THRESHOLD_US:.0f}%）"
+)
 
-roe_threshold = synced_slider("共用 ROE 門檻（%）", "us_roe_threshold", 0.0, 40.0, 0.5)
-
-selected_roe_modes = []
-for mode in ROE_MODES:
-    count = int(roe_pass_mask(df, mode, roe_threshold).sum())
-    checked = st.sidebar.checkbox(
-        f"{ROE_MODE_LABELS[mode]}　符合 {count} 家",
-        value=mode in st.session_state["us_roe_modes"],
-        key=f"us_roe_mode_{mode}",
-    )
-    if checked:
-        selected_roe_modes.append(mode)
-st.session_state["us_roe_modes"] = selected_roe_modes
-
+roe_threshold = synced_slider("ROE 門檻（%，0=不限）", "us_roe_threshold", 0.0, 40.0, 0.5)
+st.sidebar.caption(f"目前門檻下符合 {len(filter_by_roe(df, roe_threshold)):,} 家")
 st.sidebar.caption("⚠️ ROE1~ROE5 的「近→遠」順序沿用台股清單的假設，尚未針對美股個別驗證，僅供參考。")
 
 st.sidebar.divider()
@@ -458,7 +443,6 @@ currencies_for_filter = None if set(selected_currencies) == set(all_currencies) 
 irr_threshold_for_filter = None if irr_threshold_value <= IRR_SLIDER_MIN else irr_threshold_value
 
 filter_params = {
-    "roe_modes": selected_roe_modes,
     "roe_threshold": roe_threshold,
     "payout_threshold": payout_threshold,
     "net_income_threshold": net_income_threshold,
@@ -559,7 +543,9 @@ with tab_screen:
     else:
         display_df = result_df.copy()
         display_df["五點覆蓋度"] = display_df.apply(compute_coverage_score, axis=1)
-        display_df["5年ROE趨勢"] = display_df[list(reversed(ROE_COLS_RECENT_TO_OLD))].values.tolist()
+        # 5年ROE直接展開成 5 個數字欄位（而非小圖表），方便一眼比較每年數字
+        roe_year_cols = [f"ROE({label})" for label in ROE_YEAR_LABELS_OLD_TO_NEW]
+        display_df[roe_year_cols] = display_df[list(reversed(ROE_COLS_RECENT_TO_OLD))]
 
         display_df["估價區間"] = valuation_labels(display_df)
         display_df["產業(中文)"] = display_df["SECTOR"].apply(
@@ -576,7 +562,7 @@ with tab_screen:
             "財報幣別": "財報幣別",
             "市值($m)": "市值($M)",
             "預期ROE": "預期ROE(%)",
-            "5年ROE趨勢": "5年ROE趨勢",
+            **{c: c for c in roe_year_cols},
             "預期配息率": "配息率(%)",
             "預期常利": "淨利(百萬,原幣)",
             "估價區間": "估價區間",
@@ -594,11 +580,9 @@ with tab_screen:
             selection_mode="single-row",
             key="us_results_table_select",
             column_config={
-                "5年ROE趨勢": st.column_config.LineChartColumn(
-                    "5年ROE趨勢（舊→新）", width="medium"
-                ),
                 "市值($M)": st.column_config.NumberColumn(format="%.1f"),
                 "預期ROE(%)": st.column_config.NumberColumn(format="%.2f"),
+                **{c: st.column_config.NumberColumn(format="%.1f") for c in roe_year_cols},
                 "配息率(%)": st.column_config.NumberColumn(format="%.2f"),
                 "淨利(百萬,原幣)": st.column_config.NumberColumn(format="%.1f"),
                 "預期報酬率IRR(%)": st.column_config.NumberColumn(format="%.1f"),
@@ -612,20 +596,17 @@ with tab_screen:
         # -------------------------------------------------------------
         # 下載按鈕
         #
-        # CSV／Excel 共用同一份「展開表」：把畫面顯示用的『5年ROE趨勢』
-        # （一格一個 list，只有 st.dataframe 的 LineChartColumn 看得懂）
-        # 展開成 5 個獨立數值欄位，兩種下載格式的欄位才會一致，也才是能
-        # 直接在 Excel/試算表裡使用的數字，而不是一串字串。
+        # table 現在每欄都已經是純量值（5年ROE已展開成獨立數字欄位），
+        # CSV／Excel 直接共用同一份表格即可，欄位自然一致。
         # -------------------------------------------------------------
-        download_table = expand_roe_trend_column(table)
         dl_cols = st.columns(2)
         dl_cols[0].download_button(
-            "⬇️ 下載 CSV", data=_to_csv_bytes(download_table), file_name="us_screener_result.csv", mime="text/csv",
+            "⬇️ 下載 CSV", data=_to_csv_bytes(table), file_name="us_screener_result.csv", mime="text/csv",
             key="us_dl_csv",
         )
         dl_cols[1].download_button(
             "⬇️ 下載 Excel",
-            data=_to_excel_bytes(download_table),
+            data=_to_excel_bytes(table),
             file_name="us_screener_result.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="us_dl_xlsx",

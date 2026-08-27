@@ -60,40 +60,55 @@ class TestDataLoader:
         assert stripped.all()
 
 
-class TestFilterByRoeModeD:
-    """模式 D（預估值版）直接用『預期ROE』欄位，邏輯最單純，適合驗證納入/排除。"""
+class TestFilterByRoe:
+    """
+    ROE 篩選只有一套規則：近 5 年（ROE1~ROE5 實際歷史值）任一年低於門檻
+    就排除、缺值視為不通過（等同舊版「模式 A 嚴格版」，但不再需要額外
+    勾選模式才生效——門檻本身就是規則）。用手工合成資料測邊界情況最直接，
+    另外用真實資料的統一(1216)/旭隼(6409)做一次語意檢查（1216 在 ROE3
+    只有 2.3%，遠低於任何合理門檻，應被排除；6409 五年 ROE 都在 30%以上，
+    應被納入）。
+    """
 
-    def test_default_threshold_excludes_low_roe_companies(self, sample):
-        # 統一(1216)、華通(2313)、東哥(8478) 目前預期ROE 皆低於預設 15% 門檻
-        result = filter_by_roe(sample, ["D"], DEFAULT_ROE_THRESHOLD)
-        result_symbols = set(result["Symbol"])
-        for sym in ["1216", "2313", "8478"]:
-            row = get_row(sample, sym)
-            if row["預期ROE"] < DEFAULT_ROE_THRESHOLD:
-                assert sym not in result_symbols
+    def test_any_year_below_threshold_excludes_company(self):
+        sample = pd.DataFrame(
+            {
+                "Symbol": ["ALL_HIGH", "ONE_LOW", "ONE_MISSING"],
+                "ROE1": [20.0, 20.0, 20.0],
+                "ROE2": [18.0, 18.0, 18.0],
+                "ROE3": [22.0, 5.0, float("nan")],
+                "ROE4": [19.0, 19.0, 19.0],
+                "ROE5": [21.0, 21.0, 21.0],
+            }
+        )
+        result = filter_by_roe(sample, 15.0)
+        assert list(result["Symbol"]) == ["ALL_HIGH"]
 
-    def test_default_threshold_includes_high_roe_companies(self, sample):
-        # 旭隼(6409)、4763 目前預期ROE 應遠超 15% 門檻
-        result = filter_by_roe(sample, ["D"], DEFAULT_ROE_THRESHOLD)
-        result_symbols = set(result["Symbol"])
-        for sym in ["6409", "4763"]:
-            row = get_row(sample, sym)
-            if row["預期ROE"] >= DEFAULT_ROE_THRESHOLD:
-                assert sym in result_symbols
+    def test_zero_threshold_means_unlimited(self):
+        sample = pd.DataFrame(
+            {
+                "Symbol": ["A", "B"],
+                "ROE1": [1.0, float("nan")],
+                "ROE2": [1.0, float("nan")],
+                "ROE3": [1.0, float("nan")],
+                "ROE4": [1.0, float("nan")],
+                "ROE5": [1.0, float("nan")],
+            }
+        )
+        result = filter_by_roe(sample, 0.0)
+        assert len(result) == len(sample)
 
-    def test_lowering_threshold_to_10_includes_borderline_companies(self, sample):
-        """調降 ROE 門檻至 10% 後，統一、華通、東哥應被納入（若其預期ROE >= 10%）。"""
-        result = filter_by_roe(sample, ["D"], 10.0)
-        result_symbols = set(result["Symbol"])
-        for sym in ["1216", "2313", "8478"]:
-            row = get_row(sample, sym)
-            if row["預期ROE"] >= 10.0:
-                assert sym in result_symbols, f"{sym} 預期ROE={row['預期ROE']} 應在門檻10%下被納入"
+    def test_real_data_sanity_check(self, sample):
+        # 統一(1216) ROE3=2.3%，任何合理門檻下都應被排除
+        result_15 = filter_by_roe(sample, DEFAULT_ROE_THRESHOLD)
+        assert "1216" not in set(result_15["Symbol"])
+        # 旭隼(6409) 近5年ROE皆遠高於15%門檻，應被納入
+        assert "6409" in set(result_15["Symbol"])
 
-    def test_threshold_slider_actually_changes_result_count(self, sample):
-        strict = filter_by_roe(sample, ["D"], DEFAULT_ROE_THRESHOLD)
-        loose = filter_by_roe(sample, ["D"], 10.0)
-        assert len(loose) >= len(strict)
+    def test_threshold_actually_changes_result_count(self, df):
+        loose = filter_by_roe(df, 10.0)
+        strict = filter_by_roe(df, 20.0)
+        assert len(strict) <= len(loose)
 
 
 class TestFilterByPayout:
@@ -125,23 +140,6 @@ class TestFilterByNetIncome:
     def test_nan_none_means_unlimited(self, sample):
         result = filter_by_net_income(sample, None)
         assert len(result) == len(sample)
-
-
-class TestFilterByRoeModeA:
-    """模式 A（嚴格版）：5 年皆須達標，缺值視為不通過。"""
-
-    def test_higher_threshold_never_increases_result_count(self, df):
-        loose = filter_by_roe(df, ["A"], 10.0)
-        strict = filter_by_roe(df, ["A"], 20.0)
-        assert len(strict) <= len(loose)
-
-    def test_missing_year_excludes_company(self, df):
-        # 任一年 ROE 缺值的公司，在嚴格版下一律視為不通過（即使門檻設為0）
-        has_missing = df[df[["ROE1", "ROE2", "ROE3", "ROE4", "ROE5"]].isna().any(axis=1)]
-        if len(has_missing) > 0:
-            sample_missing_symbol = has_missing.iloc[0]["Symbol"]
-            result = filter_by_roe(df, ["A"], 0.0)
-            assert sample_missing_symbol not in set(result["Symbol"])
 
 
 class TestTwSectorGroupCoverage:
