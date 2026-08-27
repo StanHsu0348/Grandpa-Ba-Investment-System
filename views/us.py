@@ -29,12 +29,13 @@ from src.constants import (
     NET_INCOME_QUICK_OPTIONS_US,
     PAYOUT_QUICK_OPTIONS_US,
     ROE_COLS_RECENT_TO_OLD,
+    ROE_YEAR_LABELS_OLD_TO_NEW,
     YAHOO_FINANCE_URL_TEMPLATE,
 )
 from src.data_loader import DataLoadError, get_data_date, load_us_data
 from src.scoring import compute_coverage_score, compute_roe_stability
-from src.screener import ROE_MODE_LABELS, ROE_MODES, apply_all_filters, roe_pass_mask
-from src.ui_helpers import synced_slider
+from src.screener import ROE_MODE_LABELS, ROE_MODES, apply_all_filters, roe_pass_mask, valuation_labels
+from src.ui_helpers import expand_roe_trend_column, synced_slider
 from src.us_sector_i18n import (
     US_SECTOR_GROUPS,
     format_group_option,
@@ -75,10 +76,13 @@ def _to_excel_bytes(table: pd.DataFrame) -> bytes:
     對上萬列資料的寫入成本不小（實測美股 12,497 列約 2 秒），
     不快取的話等於每次調整任何篩選條件都要白白付這筆成本。
     快取鍵是 table 本身的內容雜湊，篩選結果不變時直接吃快取。
+
+    傳入的 table 應該已經是 expand_roe_trend_column() 展開過的版本
+    （欄位皆為可直接寫入 Excel 的純量值），呼叫端負責展開，這裡只管寫檔。
     """
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-        table.drop(columns=["5年ROE趨勢"]).to_excel(writer, index=False, sheet_name="篩選結果")
+        table.to_excel(writer, index=False, sheet_name="篩選結果")
     return excel_buffer.getvalue()
 
 
@@ -142,7 +146,7 @@ def render_stock_detail(row: pd.Series, df: pd.DataFrame, roe_threshold: float, 
         fig = go.Figure()
         fig.add_trace(
             go.Scatter(
-                x=["5年前", "4年前", "3年前", "2年前", "最近一年"],
+                x=ROE_YEAR_LABELS_OLD_TO_NEW,
                 y=roe_values,
                 mode="lines+markers",
                 name="ROE(%)",
@@ -557,16 +561,7 @@ with tab_screen:
         display_df["五點覆蓋度"] = display_df.apply(compute_coverage_score, axis=1)
         display_df["5年ROE趨勢"] = display_df[list(reversed(ROE_COLS_RECENT_TO_OLD))].values.tolist()
 
-        def valuation_label(row):
-            if pd.isna(row["貴價"]) or pd.isna(row["淑價"]) or pd.isna(row["收盤價"]):
-                return "無法估價"
-            if row["收盤價"] <= row["淑價"]:
-                return "便宜價"
-            if row["收盤價"] >= row["貴價"]:
-                return "昂貴價"
-            return "合理價"
-
-        display_df["估價區間"] = display_df.apply(valuation_label, axis=1)
+        display_df["估價區間"] = valuation_labels(display_df)
         display_df["產業(中文)"] = display_df["SECTOR"].apply(
             lambda s: us_translate(s) if pd.notna(s) else s
         )
@@ -616,15 +611,21 @@ with tab_screen:
 
         # -------------------------------------------------------------
         # 下載按鈕
+        #
+        # CSV／Excel 共用同一份「展開表」：把畫面顯示用的『5年ROE趨勢』
+        # （一格一個 list，只有 st.dataframe 的 LineChartColumn 看得懂）
+        # 展開成 5 個獨立數值欄位，兩種下載格式的欄位才會一致，也才是能
+        # 直接在 Excel/試算表裡使用的數字，而不是一串字串。
         # -------------------------------------------------------------
+        download_table = expand_roe_trend_column(table)
         dl_cols = st.columns(2)
         dl_cols[0].download_button(
-            "⬇️ 下載 CSV", data=_to_csv_bytes(table), file_name="us_screener_result.csv", mime="text/csv",
+            "⬇️ 下載 CSV", data=_to_csv_bytes(download_table), file_name="us_screener_result.csv", mime="text/csv",
             key="us_dl_csv",
         )
         dl_cols[1].download_button(
             "⬇️ 下載 Excel",
-            data=_to_excel_bytes(table),
+            data=_to_excel_bytes(download_table),
             file_name="us_screener_result.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="us_dl_xlsx",

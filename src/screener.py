@@ -97,6 +97,24 @@ def filter_by_sector(df: pd.DataFrame, sectors: Optional[Sequence[str]]) -> pd.D
 ValuationMode = Literal["any", "cheap", "fair", "expensive"]
 
 
+def _has_valid_valuation(df: pd.DataFrame) -> pd.Series:
+    """判斷是否有可用的估價資料（貴價／淑價／收盤價皆非缺值，且貴價／淑價 > 0）。
+
+    貴價／淑價 <= 0 視為無資料：實測美股清單中極低價股票（多為 <$0.1 的
+    細價股）常見『貴價』『淑價』其中一項或兩項恰為 0（例如貴價=0.1、
+    淑價=0.0），研判是資料源對極小數值四捨五入到顯示精度的副作用，而非
+    真的估出「合理買價下限是 0」，若不排除，這些股票會被收盤價（同樣是
+    正數的細價股價格）大於等於 0 的「貴價」而誤判為『昂貴價』。
+
+    filter_by_valuation() 與 valuation_labels() 共用這個判斷，確保篩選
+    邏輯與畫面上顯示的『估價區間』欄位對同一批資料的認定完全一致。
+    """
+    return (
+        df["貴價"].notna() & df["淑價"].notna() & df["收盤價"].notna()
+        & (df["貴價"] > 0) & (df["淑價"] > 0)
+    )
+
+
 def filter_by_valuation(df: pd.DataFrame, mode: ValuationMode = "any") -> pd.DataFrame:
     """
     加分項：估價區間篩選（依『貴價』／『淑價』欄位）。
@@ -104,13 +122,13 @@ def filter_by_valuation(df: pd.DataFrame, mode: ValuationMode = "any") -> pd.Dat
     - fair: 淑價 < 收盤價 < 貴價
     - expensive: 收盤價 >= 貴價
     - any: 不篩選
-    缺值（無淑價/貴價資料）一律排除在 cheap/fair/expensive 篩選結果之外。
+    缺值（無淑價/貴價資料，或貴價/淑價 <= 0，見 _has_valid_valuation()）
+    一律排除在 cheap/fair/expensive 篩選結果之外。
     """
     if mode == "any":
         return df
 
-    has_valuation = df["貴價"].notna() & df["淑價"].notna() & df["收盤價"].notna()
-    sub = df[has_valuation]
+    sub = df[_has_valid_valuation(df)]
 
     if mode == "cheap":
         return sub[sub["收盤價"] <= sub["淑價"]]
@@ -120,6 +138,28 @@ def filter_by_valuation(df: pd.DataFrame, mode: ValuationMode = "any") -> pd.Dat
         return sub[sub["收盤價"] >= sub["貴價"]]
 
     raise ValueError(f"未知的估價模式：{mode}")
+
+
+def valuation_labels(df: pd.DataFrame) -> pd.Series:
+    """
+    回傳整個 DataFrame 每列的估價區間標籤：便宜價／合理價／昂貴價／無法估價。
+
+    原本 views/tw.py、views/us.py 各自用 display_df.apply(row 函式) 算這欄，
+    兩份程式碼幾乎一樣、判斷邊界卻各自維護，容易改一邊漏改另一邊（就是
+    「貴價/淑價<=0 誤判昂貴價」這個 bug 原本的成因之一）。統一成這裡的
+    向量化版本後，兩個頁面共用同一份判斷邏輯，也和 filter_by_valuation()
+    共用同一個「有效估價資料」定義（_has_valid_valuation()）。
+    """
+    has_valuation = _has_valid_valuation(df)
+    cheap = has_valuation & (df["收盤價"] <= df["淑價"])
+    expensive = has_valuation & ~cheap & (df["收盤價"] >= df["貴價"])
+    fair = has_valuation & ~cheap & ~expensive
+
+    labels = pd.Series("無法估價", index=df.index)
+    labels[fair] = "合理價"
+    labels[cheap] = "便宜價"
+    labels[expensive] = "昂貴價"
+    return labels
 
 
 def filter_by_irr(df: pd.DataFrame, threshold: Optional[float]) -> pd.DataFrame:
