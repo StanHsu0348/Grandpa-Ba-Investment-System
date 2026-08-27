@@ -12,7 +12,10 @@ scripts/stocks_download/download_log.txt
 scripts/stocks_download/button_labels.txt
 
 # 付費訂閱資料（data/*.xlsx、data/history/）故意「不」排除，
-# 因為要靠 git push 自動同步到 Streamlit Community Cloud（private repo，只有自己看得到）。
+# 因為要靠 git push 自動同步到 Streamlit Community Cloud。
+# 注意：此 repo 目前是 Public（見 SOP.md 第 2.3 節），並非 private，
+# 之所以敢把資料檔放進 Public repo，是因為已確認資料本身是免費資料、
+# 非付費機敏內容（同樣記在 SOP.md）。
 
 # Python
 __pycache__/

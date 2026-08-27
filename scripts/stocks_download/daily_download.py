@@ -6,7 +6,8 @@
 如果 session 已經過期（被導回登入頁），會印出訊息並以非 0 狀態碼結束，
 這時需要重新執行 setup_login.py 手動登入一次。
 
-下載成功後，會自動 git add/commit/push 到 GitHub（private repo），
+下載成功後，會自動 git add/commit/push 到 GitHub（此 repo 目前是 Public，
+資料本身是免費資料、非付費機敏內容，詳見 SOP.md），
 讓部署在 Streamlit Community Cloud 上的版本跟著自動重新部署、拿到最新資料。
 git push 失敗（例如沒網路、repo 尚未設定 remote）不會讓整支腳本失敗，
 只會記錄在 log 裡，下載到的資料仍然會留在本機 data/ 目錄。
