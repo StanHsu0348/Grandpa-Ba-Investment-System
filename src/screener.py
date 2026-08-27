@@ -10,26 +10,45 @@ import pandas as pd
 
 from .constants import ROE_COLS_RECENT_TO_OLD
 
+ROE_FILTER_MODES = ("strict", "average")
 
-def filter_by_roe(df: pd.DataFrame, threshold: float) -> pd.DataFrame:
+ROE_FILTER_MODE_LABELS = {
+    "strict": "嚴格版（近5年每年皆達標）",
+    "average": "平均版（近5年平均達標）",
+}
+
+
+def filter_by_roe(df: pd.DataFrame, threshold: float, mode: str = "strict") -> pd.DataFrame:
     """
-    原則①：5 年 ROE 穩定度篩選。
+    原則①：5 年 ROE 穩定度篩選，兩種模式擇一（單選 radio，非複選 checkbox）：
 
-    規則：近 5 年（ROE1~ROE5，實際歷史值，非預期ROE）任一年低於門檻就排除；
-    缺值視為不通過（無法確認該年度是否達標）。threshold<=0 視為不限，
-    與 filter_by_payout()／filter_by_net_income() 的「0=不限」慣例一致。
+    - "strict"（嚴格版）：近5年（ROE1~ROE5，實際歷史值，非預期ROE）
+      任一年低於門檻就排除；缺值視為不通過（無法確認該年度是否達標）。
+    - "average"（平均版）：近5年（可用年度）平均值 >= 門檻；全部缺值
+      才視為不通過，其餘依實際可用年數計算平均。
 
-    這裡刻意只用一套規則，不提供「近3年版」「平均版」「用預期ROE篩選」等
-    其他寬鬆模式——早期版本曾經做過 5 種可複選模式＋共用門檻的設計，
-    但門檻本身不會自動生效，必須額外勾選對應模式才套用篩選，容易讓人
-    誤以為「設定門檻」就等於「篩選生效」。改成單一規則後，設定門檻就
-    直接套用，不需要額外的模式選擇步驟。
+    threshold<=0 視為不限，與 filter_by_payout()／filter_by_net_income()
+    的「0=不限」慣例一致。
+
+    這裡刻意用單選 radio 而非早期版本的 5 種可複選 checkbox：checkbox
+    版本門檻本身不會自動生效，必須額外勾選對應模式才套用篩選，容易讓人
+    誤以為「設定門檻」就等於「篩選生效」。radio 永遠有一個選中值，
+    門檻設定後不論選哪個模式都直接套用，不需要額外的「勾選啟用」步驟。
     """
     if threshold <= 0:
         return df
     sub = df[ROE_COLS_RECENT_TO_OLD]
-    mask = (sub >= threshold).all(axis=1) & sub.notna().all(axis=1)
-    return df[mask]
+
+    if mode == "strict":
+        mask = (sub >= threshold).all(axis=1) & sub.notna().all(axis=1)
+        return df[mask]
+
+    if mode == "average":
+        has_any = sub.notna().any(axis=1)
+        mean_val = sub.mean(axis=1, skipna=True)
+        return df[has_any & (mean_val >= threshold)]
+
+    raise ValueError(f"未知的 ROE 篩選模式：{mode}")
 
 
 def filter_by_payout(df: pd.DataFrame, threshold: float) -> pd.DataFrame:
@@ -137,6 +156,7 @@ def apply_all_filters(df: pd.DataFrame, params: dict) -> pd.DataFrame:
 
     params 支援的 key：
         roe_threshold: float
+        roe_mode: "strict"|"average"（見 ROE_FILTER_MODES，預設 "strict"）
         payout_threshold: float
         net_income_threshold: float | None
         sectors: list[str] | None
@@ -144,7 +164,9 @@ def apply_all_filters(df: pd.DataFrame, params: dict) -> pd.DataFrame:
         irr_threshold: float | None
     """
     result = df
-    result = filter_by_roe(result, params.get("roe_threshold", 0.0))
+    result = filter_by_roe(
+        result, params.get("roe_threshold", 0.0), params.get("roe_mode", "strict")
+    )
     result = filter_by_payout(result, params.get("payout_threshold", 0.0))
     result = filter_by_net_income(result, params.get("net_income_threshold"))
     result = filter_by_sector(result, params.get("sectors"))
