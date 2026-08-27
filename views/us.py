@@ -35,7 +35,13 @@ from src.constants import (
 )
 from src.data_loader import DataLoadError, get_data_date, load_us_data
 from src.scoring import compute_coverage_score, compute_roe_stability
-from src.screener import apply_all_filters, filter_by_roe, valuation_labels
+from src.screener import (
+    ROE_FILTER_MODE_LABELS,
+    ROE_FILTER_MODES,
+    apply_all_filters,
+    filter_by_roe,
+    valuation_labels,
+)
 from src.ui_helpers import synced_slider
 from src.us_sector_i18n import (
     US_SECTOR_GROUPS,
@@ -87,6 +93,7 @@ def _to_excel_bytes(table: pd.DataFrame) -> bytes:
 
 def init_session_defaults():
     defaults = {
+        "us_roe_mode": "strict",
         "us_roe_threshold_slider": 0.0,
         "us_roe_threshold_input": 0.0,
         "us_payout_threshold_slider": 0.0,
@@ -113,6 +120,7 @@ def clear_all_filters(all_sectors, all_currencies):
     再修改其對應的 session_state key。因此這個函式必須在任何側邊欄
     widget 建立「之前」呼叫（見下方 `_us_clear_filters_pending` 的處理方式）。
     """
+    st.session_state["us_roe_mode"] = "strict"
     st.session_state["us_roe_threshold_slider"] = 0.0
     st.session_state["us_roe_threshold_input"] = 0.0
     st.session_state["us_payout_threshold_slider"] = 0.0
@@ -300,12 +308,18 @@ st.sidebar.divider()
 # ---------------------------------------------------------------------------
 st.sidebar.header("① ROE 穩定度篩選")
 st.sidebar.caption(
-    f"近5年（ROE1~ROE5 實際歷史值，非預期ROE）任一年低於門檻就排除，"
+    f"近5年（ROE1~ROE5 實際歷史值，非預期ROE）依所選模式與門檻篩選，"
     f"缺值視為不通過。門檻設為 0 代表不限。（課程門檻參考值：{DEFAULT_ROE_THRESHOLD_US:.0f}%）"
 )
 
+roe_mode = st.sidebar.radio(
+    "篩選模式",
+    options=ROE_FILTER_MODES,
+    format_func=lambda m: ROE_FILTER_MODE_LABELS[m],
+    key="us_roe_mode",
+)
 roe_threshold = synced_slider("ROE 門檻（%，0=不限）", "us_roe_threshold", 0.0, 40.0, 0.5)
-st.sidebar.caption(f"目前門檻下符合 {len(filter_by_roe(df, roe_threshold)):,} 家")
+st.sidebar.caption(f"目前模式與門檻下符合 {len(filter_by_roe(df, roe_threshold, roe_mode)):,} 家")
 st.sidebar.caption("⚠️ ROE1~ROE5 的「近→遠」順序沿用台股清單的假設，尚未針對美股個別驗證，僅供參考。")
 
 st.sidebar.divider()
@@ -448,6 +462,7 @@ irr_threshold_for_filter = None if irr_threshold_value <= IRR_SLIDER_MIN else ir
 
 filter_params = {
     "roe_threshold": roe_threshold,
+    "roe_mode": roe_mode,
     "payout_threshold": payout_threshold,
     "net_income_threshold": net_income_threshold,
     "sectors": sectors_for_filter,

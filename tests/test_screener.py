@@ -62,15 +62,18 @@ class TestDataLoader:
 
 class TestFilterByRoe:
     """
-    ROE 篩選只有一套規則：近 5 年（ROE1~ROE5 實際歷史值）任一年低於門檻
-    就排除、缺值視為不通過（等同舊版「模式 A 嚴格版」，但不再需要額外
-    勾選模式才生效——門檻本身就是規則）。用手工合成資料測邊界情況最直接，
-    另外用真實資料的統一(1216)/旭隼(6409)做一次語意檢查（1216 在 ROE3
-    只有 2.3%，遠低於任何合理門檻，應被排除；6409 五年 ROE 都在 30%以上，
-    應被納入）。
+    ROE 篩選提供兩種模式（radio 單選，不是 checkbox 複選——永遠有一個
+    選中值，門檻設定後不論選哪個模式都直接套用，不需要額外的「勾選啟用」
+    步驟）：
+    - "strict"（預設）：近5年（ROE1~ROE5 實際歷史值）任一年低於門檻就
+      排除，缺值視為不通過。
+    - "average"：近5年（可用年度）平均值 >= 門檻，全部缺值才視為不通過。
+    用手工合成資料測邊界情況最直接，另外用真實資料的統一(1216)/旭隼(6409)
+    做一次語意檢查（1216 在 ROE3 只有 2.3%，遠低於任何合理門檻，嚴格版
+    應被排除；6409 五年 ROE 都在 30%以上，兩種模式都應被納入）。
     """
 
-    def test_any_year_below_threshold_excludes_company(self):
+    def test_strict_mode_any_year_below_threshold_excludes_company(self):
         sample = pd.DataFrame(
             {
                 "Symbol": ["ALL_HIGH", "ONE_LOW", "ONE_MISSING"],
@@ -81,8 +84,75 @@ class TestFilterByRoe:
                 "ROE5": [21.0, 21.0, 21.0],
             }
         )
-        result = filter_by_roe(sample, 15.0)
+        result = filter_by_roe(sample, 15.0, "strict")
         assert list(result["Symbol"]) == ["ALL_HIGH"]
+
+    def test_strict_mode_is_default(self):
+        # 不傳 mode 參數時應等同 "strict"，維持既有呼叫端（未指定 mode）的行為
+        sample = pd.DataFrame(
+            {
+                "Symbol": ["ALL_HIGH", "ONE_LOW"],
+                "ROE1": [20.0, 20.0],
+                "ROE2": [18.0, 18.0],
+                "ROE3": [22.0, 5.0],
+                "ROE4": [19.0, 19.0],
+                "ROE5": [21.0, 21.0],
+            }
+        )
+        assert list(filter_by_roe(sample, 15.0)["Symbol"]) == list(
+            filter_by_roe(sample, 15.0, "strict")["Symbol"]
+        )
+
+    def test_average_mode_allows_one_low_year_if_average_passes(self):
+        # ONE_LOW 平均 = (20+18+5+19+21)/5 = 16.6，門檻15%下平均版應納入
+        # （嚴格版下 ONE_LOW 因為有一年5%<15%而被排除，兩模式行為應不同）
+        sample = pd.DataFrame(
+            {
+                "Symbol": ["ALL_HIGH", "ONE_LOW", "ALL_LOW"],
+                "ROE1": [20.0, 20.0, 5.0],
+                "ROE2": [18.0, 18.0, 5.0],
+                "ROE3": [22.0, 5.0, 5.0],
+                "ROE4": [19.0, 19.0, 5.0],
+                "ROE5": [21.0, 21.0, 5.0],
+            }
+        )
+        result = filter_by_roe(sample, 15.0, "average")
+        assert set(result["Symbol"]) == {"ALL_HIGH", "ONE_LOW"}
+
+    def test_average_mode_uses_available_years_only(self):
+        # 有缺值但其餘年度平均達標，平均版應納入（缺值不計入平均、也不算不通過）
+        sample = pd.DataFrame(
+            {
+                "Symbol": ["PARTIAL"],
+                "ROE1": [20.0],
+                "ROE2": [float("nan")],
+                "ROE3": [float("nan")],
+                "ROE4": [float("nan")],
+                "ROE5": [float("nan")],
+            }
+        )
+        result = filter_by_roe(sample, 15.0, "average")
+        assert list(result["Symbol"]) == ["PARTIAL"]
+
+    def test_average_mode_all_missing_excludes_company(self):
+        sample = pd.DataFrame(
+            {
+                "Symbol": ["ALL_MISSING"],
+                "ROE1": [float("nan")],
+                "ROE2": [float("nan")],
+                "ROE3": [float("nan")],
+                "ROE4": [float("nan")],
+                "ROE5": [float("nan")],
+            }
+        )
+        result = filter_by_roe(sample, 15.0, "average")
+        assert len(result) == 0
+
+    def test_unknown_mode_raises(self):
+        sample = pd.DataFrame({"Symbol": ["A"], "ROE1": [20.0], "ROE2": [20.0],
+                                "ROE3": [20.0], "ROE4": [20.0], "ROE5": [20.0]})
+        with pytest.raises(ValueError):
+            filter_by_roe(sample, 15.0, "nonexistent")
 
     def test_zero_threshold_means_unlimited(self):
         sample = pd.DataFrame(
@@ -95,20 +165,31 @@ class TestFilterByRoe:
                 "ROE5": [1.0, float("nan")],
             }
         )
-        result = filter_by_roe(sample, 0.0)
-        assert len(result) == len(sample)
+        for mode in ("strict", "average"):
+            result = filter_by_roe(sample, 0.0, mode)
+            assert len(result) == len(sample), f"mode={mode}"
 
     def test_real_data_sanity_check(self, sample):
-        # 統一(1216) ROE3=2.3%，任何合理門檻下都應被排除
-        result_15 = filter_by_roe(sample, DEFAULT_ROE_THRESHOLD)
+        # 統一(1216) ROE3=2.3%，嚴格版下任何合理門檻都應被排除
+        result_15 = filter_by_roe(sample, DEFAULT_ROE_THRESHOLD, "strict")
         assert "1216" not in set(result_15["Symbol"])
-        # 旭隼(6409) 近5年ROE皆遠高於15%門檻，應被納入
+        # 旭隼(6409) 近5年ROE皆遠高於15%門檻，嚴格版／平均版都應被納入
         assert "6409" in set(result_15["Symbol"])
+        assert "6409" in set(filter_by_roe(sample, DEFAULT_ROE_THRESHOLD, "average")["Symbol"])
 
     def test_threshold_actually_changes_result_count(self, df):
-        loose = filter_by_roe(df, 10.0)
-        strict = filter_by_roe(df, 20.0)
-        assert len(strict) <= len(loose)
+        for mode in ("strict", "average"):
+            loose = filter_by_roe(df, 10.0, mode)
+            strict = filter_by_roe(df, 20.0, mode)
+            assert len(strict) <= len(loose), f"mode={mode}"
+
+    def test_average_mode_never_stricter_than_strict_mode(self, df):
+        # 平均版邏輯上一定比嚴格版寬鬆（或相等）：嚴格版通過的公司，平均值
+        # 必然 >= 門檻（因為每年都 >= 門檻），平均版也一定會納入。
+        threshold = 15.0
+        strict_symbols = set(filter_by_roe(df, threshold, "strict")["Symbol"])
+        average_symbols = set(filter_by_roe(df, threshold, "average")["Symbol"])
+        assert strict_symbols <= average_symbols
 
 
 class TestFilterByPayout:
