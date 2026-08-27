@@ -4,10 +4,7 @@ Streamlit UI 共用元件（不含任何特定市場的資料邏輯，台股／�
 """
 from __future__ import annotations
 
-import pandas as pd
 import streamlit as st
-
-from .constants import ROE_YEAR_LABELS_OLD_TO_NEW
 
 
 def synced_slider(label: str, key_prefix: str, min_value: float, max_value: float,
@@ -49,21 +46,3 @@ def synced_slider(label: str, key_prefix: str, min_value: float, max_value: floa
             label_visibility="collapsed",
         )
     return st.session_state[slider_key]
-
-
-def expand_roe_trend_column(table: pd.DataFrame, trend_col: str = "5年ROE趨勢") -> pd.DataFrame:
-    """
-    把畫面顯示用的『5年ROE趨勢』欄位（每個儲存格是一個 Python list，只有
-    st.dataframe 的 LineChartColumn 看得懂）展開成 5 個獨立數值欄位。
-
-    CSV／Excel 下載原本各自處理這個問題：CSV 直接輸出整欄，結果是每格
-    一串 "[9.0, 2.3, 3.2, 3.5, 1.9]" 這樣的字串，沒辦法在 Excel 裡直接
-    拿來畫圖或算數；Excel 版本則乾脆把整欄刪掉，兩種下載格式的欄位因此
-    對不起來。這裡統一改成展開成 5 欄實際數字（欄名為「ROE(5年前)」……
-    「ROE(最近一年)」），CSV／Excel 都呼叫這個函式，欄位才會一致，
-    數字也才是真的能在試算表裡使用的數值而非字串。
-    """
-    out = table.drop(columns=[trend_col]).copy()
-    year_cols = [f"ROE({label})" for label in ROE_YEAR_LABELS_OLD_TO_NEW]
-    trend_matrix = pd.DataFrame(table[trend_col].tolist(), columns=year_cols, index=table.index)
-    return pd.concat([out, trend_matrix], axis=1)

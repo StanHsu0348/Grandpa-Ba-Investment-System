@@ -62,21 +62,26 @@ class TestUsDataLoader:
 
 
 class TestUsFilterByRoe:
-    def test_default_threshold_excludes_low_roe_companies(self, sample):
-        result = filter_by_roe(sample, ["D"], DEFAULT_ROE_THRESHOLD_US)
-        result_symbols = set(result["Symbol"])
-        for sym in TEST_SYMBOLS:
-            row = get_row(sample, sym)
-            if row["預期ROE"] < DEFAULT_ROE_THRESHOLD_US:
-                assert sym not in result_symbols
+    """
+    ROE 篩選規則與台股頁面共用同一套邏輯（近5年 ROE1~ROE5 任一年低於門檻
+    就排除，缺值視為不通過），這裡只需驗證用在美股資料上依然正確——
+    AAPL/MSFT/KO 近5年 ROE 都遠高於課程門檻 15%，應全數通過；
+    再用極高門檻測試篩選確實會排除公司。
+    """
 
     def test_default_threshold_includes_high_roe_companies(self, sample):
-        result = filter_by_roe(sample, ["D"], DEFAULT_ROE_THRESHOLD_US)
+        result = filter_by_roe(sample, DEFAULT_ROE_THRESHOLD_US)
         result_symbols = set(result["Symbol"])
         for sym in TEST_SYMBOLS:
-            row = get_row(sample, sym)
-            if row["預期ROE"] >= DEFAULT_ROE_THRESHOLD_US:
-                assert sym in result_symbols
+            assert sym in result_symbols
+
+    def test_very_high_threshold_excludes_companies(self, df):
+        result = filter_by_roe(df, 500.0)
+        assert len(result) < len(df)
+
+    def test_zero_threshold_means_unlimited(self, df):
+        result = filter_by_roe(df, 0.0)
+        assert len(result) == len(df)
 
 
 class TestUsFilterByPayout:
