@@ -24,6 +24,12 @@ REQUIRED_COLUMNS = [
     "ROE4",
     "ROE5",
     "SECTOR",
+    # Shares、預期報酬率並非五點原則本身用到的欄位，但 views/tw.py 分別拿來算
+    # 市值(億) 與 IRR 篩選，若這裡不驗證，上傳到這兩欄缺漏的檔案會通過
+    # load_tw_data() 檢查、卻在畫面渲染時噴出 KeyError（使用者只會看到原生
+    # traceback，看不出是缺欄位），所以兩者都必須是必要欄位。
+    "Shares",
+    "預期報酬率",
 ]
 
 NUMERIC_COLUMNS = [
@@ -39,6 +45,8 @@ NUMERIC_COLUMNS = [
     "ROE3",
     "ROE4",
     "ROE5",
+    "Shares",
+    "預期報酬率",
 ]
 
 

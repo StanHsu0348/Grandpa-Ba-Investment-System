@@ -61,6 +61,27 @@ def _load_from_bytes(file_bytes: bytes) -> pd.DataFrame:
     return load_us_data(io.BytesIO(file_bytes))
 
 
+@st.cache_data(show_spinner=False)
+def _to_csv_bytes(table: pd.DataFrame) -> bytes:
+    return table.to_csv(index=False).encode("utf-8-sig")
+
+
+@st.cache_data(show_spinner=False)
+def _to_excel_bytes(table: pd.DataFrame) -> bytes:
+    """把篩選結果表轉成 Excel bytes，供下載按鈕使用。
+
+    這裡加上 @st.cache_data 是因為 st.download_button 每次 script rerun
+    都要重新取得 data= 參數（哪怕使用者根本沒按下載），而 ExcelWriter
+    對上萬列資料的寫入成本不小（實測美股 12,497 列約 2 秒），
+    不快取的話等於每次調整任何篩選條件都要白白付這筆成本。
+    快取鍵是 table 本身的內容雜湊，篩選結果不變時直接吃快取。
+    """
+    excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+        table.drop(columns=["5年ROE趨勢"]).to_excel(writer, index=False, sheet_name="篩選結果")
+    return excel_buffer.getvalue()
+
+
 def init_session_defaults():
     defaults = {
         "us_roe_modes": [],
@@ -597,18 +618,13 @@ with tab_screen:
         # 下載按鈕
         # -------------------------------------------------------------
         dl_cols = st.columns(2)
-        csv_bytes = table.to_csv(index=False).encode("utf-8-sig")
         dl_cols[0].download_button(
-            "⬇️ 下載 CSV", data=csv_bytes, file_name="us_screener_result.csv", mime="text/csv",
+            "⬇️ 下載 CSV", data=_to_csv_bytes(table), file_name="us_screener_result.csv", mime="text/csv",
             key="us_dl_csv",
         )
-
-        excel_buffer = io.BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-            table.drop(columns=["5年ROE趨勢"]).to_excel(writer, index=False, sheet_name="篩選結果")
         dl_cols[1].download_button(
             "⬇️ 下載 Excel",
-            data=excel_buffer.getvalue(),
+            data=_to_excel_bytes(table),
             file_name="us_screener_result.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="us_dl_xlsx",
@@ -637,13 +653,15 @@ with tab_screen:
             )
         symbol_options = (result_df["Symbol"] + "　" + result_df["COMPANY"]).tolist()
 
+        # 刻意不對這個 selectbox 使用 key（見 views/tw.py 同一位置的詳細註解）：
+        # 一旦加上 key，Streamlit 會把 key 當成 widget 唯一身分、之後每次
+        # rerun 都忽略 index=，導致「點表格列 → 跳到該股票」完全失效。
         current_symbol = st.session_state.get("us_detail_symbol")
         current_label = next((lbl for lbl in symbol_options if lbl.startswith(f"{current_symbol}　")), None)
         default_index = symbol_options.index(current_label) if current_label else 0
 
         picked = st.selectbox(
             "選擇股票查看詳情（或直接點擊上方表格列）", options=symbol_options, index=default_index,
-            key="us_detail_picker",
         )
 
         if picked:
