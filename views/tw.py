@@ -14,7 +14,7 @@ from src.constants import (
     COVERAGE_AUTO_ITEMS,
     COVERAGE_TOTAL,
     DEFAULT_IRR_THRESHOLD,
-    DEFAULT_NET_INCOME_THRESHOLD,
+    DEFAULT_MARKET_CAP_THRESHOLD,
     DEFAULT_PAYOUT_THRESHOLD,
     DEFAULT_ROE_THRESHOLD,
     IRR_QUICK_OPTIONS,
@@ -153,7 +153,7 @@ def render_stock_detail(row: pd.Series, df: pd.DataFrame, roe_threshold: float, 
         st.markdown("**五點原則逐項檢核**")
         roe_ok = None if pd.isna(row["預期ROE"]) or roe_threshold <= 0 else row["預期ROE"] >= roe_threshold
         payout_ok = row["預期配息率"] >= DEFAULT_PAYOUT_THRESHOLD
-        net_income_ok = row["預期常利"] >= DEFAULT_NET_INCOME_THRESHOLD
+        market_cap_ok = None if pd.isna(row["市值(億)"]) else row["市值(億)"] >= DEFAULT_MARKET_CAP_THRESHOLD
 
         def mark(ok):
             if ok is None:
@@ -174,9 +174,10 @@ def render_stock_detail(row: pd.Series, df: pd.DataFrame, roe_threshold: float, 
             f"（課程門檻 {DEFAULT_PAYOUT_THRESHOLD}%），盈再率 {retention_text}"
         )
         st.markdown(f"- ⚠️ ③不會變的公司：產業別「{row['SECTOR']}」，請自行判斷")
+        market_cap_text = "—（無資料）" if pd.isna(row["市值(億)"]) else f"{row['市值(億)']:.1f} 億元"
         st.markdown(
-            f"- {mark(net_income_ok)} ④公司夠大：預期常利 {row['預期常利']:.1f} 百萬元"
-            f"（課程門檻 {DEFAULT_NET_INCOME_THRESHOLD:.0f}），上市年資 ❌ 待查證"
+            f"- {mark(market_cap_ok)} ④公司夠大：市值 {market_cap_text}"
+            f"（門檻 {DEFAULT_MARKET_CAP_THRESHOLD:.0f} 億元），上市年資 ❌ 待查證"
         )
         st.markdown("- ❌ ⑤老闆誠信：董監持股 待查證")
 

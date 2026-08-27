@@ -33,7 +33,12 @@ ROE_YEAR_LABELS_OLD_TO_NEW = ["5年前", "4年前", "3年前", "2年前", "最�
 # ---------------------------------------------------------------------------
 DEFAULT_ROE_THRESHOLD = 15.0          # 原則① ROE 門檻（%）
 DEFAULT_PAYOUT_THRESHOLD = 40.0       # 原則② 配息率門檻（%）
-DEFAULT_NET_INCOME_THRESHOLD = 500.0  # 原則④ 淨利門檻（百萬元，5億）
+DEFAULT_NET_INCOME_THRESHOLD = 500.0  # 原則④ 淨利門檻（百萬元，5億，側邊欄篩選用）
+# 原則④「公司夠大」在個股詳細檢視卡片改直接看市值（比淨利更直覺），
+# 門檻取自現行淨利門檻（5億元）乘上約 10 倍本益比估算的合理下限。
+# 僅供個股詳細卡片的單項檢核使用，側邊欄的「④淨利門檻」篩選仍以淨利為準，
+# 兩者刻意分開，不強制統一成同一套標準。
+DEFAULT_MARKET_CAP_THRESHOLD = 50.0   # 市值門檻（億元）
 DEFAULT_IRR_THRESHOLD = 15.0          # 延伸判準：合理買價報酬率 IRR 門檻（%）
 
 PAYOUT_QUICK_OPTIONS = {
@@ -91,6 +96,9 @@ DEFAULT_PAYOUT_THRESHOLD_US = 40.0     # 原則② 配息率門檻（%）
 # 原則④ 淨利門檻：改用課程附錄「稅前淨利國際級 > USD 75M」延伸判準
 # （單位：百萬美元，美股體質差異極大，不沿用台股 5億元台幣的門檻數字）
 DEFAULT_NET_INCOME_THRESHOLD_US = 75.0
+# 個股詳細檢視卡片的「④公司夠大」改看市值（見上方 DEFAULT_MARKET_CAP_THRESHOLD
+# 的說明），美股門檻取自現行淨利門檻（$75M）乘上約 10 倍本益比估算的合理下限。
+DEFAULT_MARKET_CAP_THRESHOLD_US = 500.0  # 市值門檻（百萬美元）
 DEFAULT_IRR_THRESHOLD_US = 15.0        # 延伸判準：合理買價報酬率 IRR 門檻（%）
 
 PAYOUT_QUICK_OPTIONS_US = dict(PAYOUT_QUICK_OPTIONS)

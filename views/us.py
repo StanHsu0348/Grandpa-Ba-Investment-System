@@ -19,6 +19,7 @@ from src.constants import (
     COVERAGE_TOTAL,
     CURRENCY_CAVEAT_NOTE,
     DEFAULT_IRR_THRESHOLD_US,
+    DEFAULT_MARKET_CAP_THRESHOLD_US,
     DEFAULT_NET_INCOME_THRESHOLD_US,
     DEFAULT_PAYOUT_THRESHOLD_US,
     DEFAULT_ROE_THRESHOLD_US,
@@ -164,14 +165,12 @@ def render_stock_detail(row: pd.Series, df: pd.DataFrame, roe_threshold: float, 
         st.markdown("**五點原則逐項檢核**")
         roe_ok = None if pd.isna(row["預期ROE"]) or roe_threshold <= 0 else row["預期ROE"] >= roe_threshold
         payout_ok = row["預期配息率"] >= DEFAULT_PAYOUT_THRESHOLD_US
-        net_income_ok = row["預期常利"] >= DEFAULT_NET_INCOME_THRESHOLD_US
+        market_cap_ok = None if pd.isna(row["市值($m)"]) else row["市值($m)"] >= DEFAULT_MARKET_CAP_THRESHOLD_US
 
         def mark(ok):
             if ok is None:
                 return "⚠️"
             return "✅" if ok else "❌"
-
-        currency = row["財報幣別"] if pd.notna(row["財報幣別"]) else "?"
 
         roe_text = "—（無資料）" if pd.isna(row["預期ROE"]) else f"{row['預期ROE']:.2f}%"
         roe_history_text = " / ".join(
@@ -191,9 +190,14 @@ def render_stock_detail(row: pd.Series, df: pd.DataFrame, roe_threshold: float, 
         st.markdown(
             f"- ⚠️ ③不會變的公司：Sector「{sector_display}」／Industry「{industry_display}」，請自行判斷"
         )
+        # 注意：st.markdown 會把「$…$」解讀成 LaTeX 數學公式語法，兩個裸的
+        # 錢字號同一行會讓中間文字被吃掉、跑出奇怪的等寬字樣式，因此這裡
+        # 跟著本檔案其他地方（例如淨利門檻說明）的慣例改用「USD」文字，
+        # 不直接輸出「$」符號。
+        market_cap_text = "—（無資料）" if pd.isna(row["市值($m)"]) else f"USD {row['市值($m)']:.1f}M"
         st.markdown(
-            f"- {mark(net_income_ok)} ④公司夠大：預期常利 {row['預期常利']:.1f} 百萬{currency}"
-            f"（課程延伸門檻 USD {DEFAULT_NET_INCOME_THRESHOLD_US:.0f}M，此處未做幣別換算），上市年資 ❌ 待查證"
+            f"- {mark(market_cap_ok)} ④公司夠大：市值 {market_cap_text}"
+            f"（門檻 USD {DEFAULT_MARKET_CAP_THRESHOLD_US:.0f}M），上市年資 ❌ 待查證"
         )
         st.markdown("- ❌ ⑤老闆誠信：內部人（董監）持股 待查證")
 
