@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from .constants import ROE_COLS_RECENT_TO_OLD, ROE_RECENT_3_COLS
-from .scoring import compute_roe_stability
+from .scoring import compute_roe_stability_bulk
 
 ROE_MODES = ("A", "B", "C", "D", "E")
 
@@ -48,8 +48,10 @@ def roe_pass_mask(df: pd.DataFrame, mode: str, threshold: float) -> pd.Series:
         return df["預期ROE"] >= threshold
 
     if mode == "E":
-        stability = df.apply(compute_roe_stability, axis=1)
-        trend = stability.apply(lambda d: d["trend"])
+        # 用向量化版本（見 scoring.compute_roe_stability_bulk）取代逐列
+        # df.apply + np.polyfit，這裡是側邊欄即時計數的效能瓶頸來源
+        # （美股 12,497 列，逐列版本約 1.2 秒／次，向量化後降到毫秒級）。
+        trend = compute_roe_stability_bulk(df)["trend"]
         sub = df[ROE_COLS_RECENT_TO_OLD]
         mean_val = sub.mean(axis=1, skipna=True)
         has_any = sub.notna().any(axis=1)
