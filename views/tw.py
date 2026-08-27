@@ -51,6 +51,27 @@ def _load_from_bytes(file_bytes: bytes) -> pd.DataFrame:
     return load_tw_data(io.BytesIO(file_bytes))
 
 
+@st.cache_data(show_spinner=False)
+def _to_csv_bytes(table: pd.DataFrame) -> bytes:
+    return table.to_csv(index=False).encode("utf-8-sig")
+
+
+@st.cache_data(show_spinner=False)
+def _to_excel_bytes(table: pd.DataFrame) -> bytes:
+    """把篩選結果表轉成 Excel bytes，供下載按鈕使用。
+
+    這裡加上 @st.cache_data 是因為 st.download_button 每次 script rerun
+    都要重新取得 data= 參數（哪怕使用者根本沒按下載），而 ExcelWriter
+    對上萬列資料的寫入成本不小（實測美股 12,497 列約 2 秒），
+    不快取的話等於每次調整任何篩選條件都要白白付這筆成本。
+    快取鍵是 table 本身的內容雜湊，篩選結果不變時直接吃快取。
+    """
+    excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+        table.drop(columns=["5年ROE趨勢"]).to_excel(writer, index=False, sheet_name="篩選結果")
+    return excel_buffer.getvalue()
+
+
 def init_session_defaults():
     defaults = {
         "tw_roe_modes": [],
@@ -552,18 +573,13 @@ with tab_screen:
         # 下載按鈕
         # -------------------------------------------------------------
         dl_cols = st.columns(2)
-        csv_bytes = table.to_csv(index=False).encode("utf-8-sig")
         dl_cols[0].download_button(
-            "⬇️ 下載 CSV", data=csv_bytes, file_name="tw_screener_result.csv", mime="text/csv",
+            "⬇️ 下載 CSV", data=_to_csv_bytes(table), file_name="tw_screener_result.csv", mime="text/csv",
             key="tw_dl_csv",
         )
-
-        excel_buffer = io.BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-            table.drop(columns=["5年ROE趨勢"]).to_excel(writer, index=False, sheet_name="篩選結果")
         dl_cols[1].download_button(
             "⬇️ 下載 Excel",
-            data=excel_buffer.getvalue(),
+            data=_to_excel_bytes(table),
             file_name="tw_screener_result.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="tw_dl_xlsx",
@@ -597,16 +613,19 @@ with tab_screen:
 
         # 決定下拉選單預設值：優先採用「表格點擊」或前一次選擇記住的股票，
         # 若該股票已被目前篩選條件排除，則退回第一筆。這裡刻意不對 selectbox
-        # 使用 key 綁定 session_state，而是每次執行時用 index= 計算出的「衍生值」
-        # 帶入，並在下面把使用者手動選擇的結果寫回 session_state，
-        # 避免和「清空所有篩選」一樣踩到 widget 建立後不能改其 key 的限制。
+        # 使用 key（不要加 key= 參數！），而是每次執行時用 index= 計算出的
+        # 「衍生值」帶入，並在下面把使用者手動選擇的結果寫回 session_state。
+        # 一旦加上 key，Streamlit（≥1.49，key_as_main_identity 機制）會把
+        # key 當成這個 widget 的唯一身分、之後每次 rerun 都忽略 index=，
+        # 導致「點表格列 → 更新 tw_detail_symbol → 想帶動下拉選單跳過去」
+        # 完全失效（曾經真的這樣壞過一次，見 commit 歷史），選單會卡在
+        # 使用者上一次手動選的股票，點表格列變成沒有反應。
         current_symbol = st.session_state.get("tw_detail_symbol")
         current_label = next((lbl for lbl in symbol_options if lbl.startswith(f"{current_symbol}　")), None)
         default_index = symbol_options.index(current_label) if current_label else 0
 
         picked = st.selectbox(
             "選擇股票查看詳情（或直接點擊上方表格列）", options=symbol_options, index=default_index,
-            key="tw_detail_picker",
         )
 
         if picked:
