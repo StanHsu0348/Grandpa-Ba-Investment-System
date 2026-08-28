@@ -41,15 +41,18 @@ _CSS = """
     font-weight: 500;
     transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
+/* 選中分頁的底色故意不分「淺色/深色模式」兩套寫死顏色（原本用
+   @media (prefers-color-scheme: dark) 判斷），因為 Streamlit 的淺色／
+   深色其實有兩種切換來源：跟隨系統設定（會反映在 prefers-color-scheme），
+   以及使用者在右上角選單手動選 Light/Dark（不會反映在 prefers-color-scheme，
+   Streamlit 也沒有在 DOM 上留下任何 data-theme 屬性或 CSS 變數可供判斷）。
+   實測：系統為淺色、手動選單選「Dark」時，頁面背景會確實變深色，但這裡
+   若照 prefers-color-scheme 判斷會誤判成淺色，選中分頁變成一顆刺眼的
+   白色藥丸浮在深色頁面上。改用中性半透明灰階＋邊框，疊在淺色或深色底色
+   上都有適度對比，不需要判斷目前是哪個模式。 */
 [data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {
-    background-color: rgba(255, 255, 255, 0.9);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-}
-@media (prefers-color-scheme: dark) {
-    [data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {
-        background-color: rgba(120, 120, 128, 0.36);
-        box-shadow: none;
-    }
+    background-color: rgba(120, 120, 128, 0.28);
+    border: 1px solid rgba(120, 120, 128, 0.24);
 }
 
 /* 指標大數字的字距收緊一點，貼近 Apple Stocks 的大數字排版 */

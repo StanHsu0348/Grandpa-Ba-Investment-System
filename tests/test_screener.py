@@ -15,7 +15,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.data_loader import load_tw_data
-from src.screener import filter_by_net_income, filter_by_payout, filter_by_roe
+from src.screener import filter_by_net_income, filter_by_payout, filter_by_roe, roe_row_passes
 from src.constants import (
     DEFAULT_NET_INCOME_THRESHOLD,
     DEFAULT_PAYOUT_THRESHOLD,
@@ -190,6 +190,37 @@ class TestFilterByRoe:
         strict_symbols = set(filter_by_roe(df, threshold, "strict")["Symbol"])
         average_symbols = set(filter_by_roe(df, threshold, "average")["Symbol"])
         assert strict_symbols <= average_symbols
+
+
+class TestRoeRowPasses:
+    """
+    roe_row_passes() 是個股詳細卡片①判定用的單列版本，必須跟 filter_by_roe()
+    （側邊欄篩選用的批次版本）完全一致，否則會重現修正前的 bug：同一檔股票
+    在「篩選結果表」通過①，「個股詳細卡片」卻顯示①未通過（或反之）。
+    """
+
+    def test_matches_filter_by_roe_strict(self, df):
+        threshold = 15.0
+        passed_symbols = set(filter_by_roe(df, threshold, "strict")["Symbol"])
+        mismatches = [
+            row["Symbol"] for _, row in df.iterrows()
+            if roe_row_passes(row, threshold, "strict") != (row["Symbol"] in passed_symbols)
+        ]
+        assert mismatches == []
+
+    def test_matches_filter_by_roe_average(self, df):
+        threshold = 15.0
+        passed_symbols = set(filter_by_roe(df, threshold, "average")["Symbol"])
+        mismatches = [
+            row["Symbol"] for _, row in df.iterrows()
+            if roe_row_passes(row, threshold, "average") != (row["Symbol"] in passed_symbols)
+        ]
+        assert mismatches == []
+
+    def test_zero_threshold_returns_none(self, sample):
+        row = sample.iloc[0]
+        assert roe_row_passes(row, 0.0, "strict") is None
+        assert roe_row_passes(row, -5.0, "average") is None
 
 
 class TestFilterByPayout:

@@ -11,11 +11,18 @@ scripts/stocks_download/downloadlist_dump.html
 scripts/stocks_download/download_log.txt
 scripts/stocks_download/button_labels.txt
 
-# 付費訂閱資料（data/*.xlsx、data/history/）故意「不」排除，
-# 因為要靠 git push 自動同步到 Streamlit Community Cloud。
-# 注意：此 repo 目前是 Public（見 SOP.md 第 2.3 節），並非 private，
-# 之所以敢把資料檔放進 Public repo，是因為已確認資料本身是免費資料、
-# 非付費機敏內容（同樣記在 SOP.md）。
+# 付費訂閱資料 data/twlist.xlsx、data/uslist.xlsx（現用資料本體）故意「不」
+# 排除，因為要靠 git push 自動同步到 Streamlit Community Cloud（app.py 直接
+# 讀這兩個檔案）。注意：此 repo 目前是 Public（見 SOP.md 第 2.3 節），並非
+# private，之所以敢把資料檔放進 Public repo，是因為已確認資料本身是免費
+# 資料、非付費機敏內容（同樣記在 SOP.md）。
+#
+# data/history/（daily_download.py 每天另存的歷史備份，app.py 不會讀取這個
+# 目錄）則相反、故意排除：純本機留存的稽核用途，每天約 2.5MB、一年下來會
+# 讓 Public repo 累積到 900MB 上下，clone／部署都會被拖慢，而且對正式運作
+# 完全沒有必要（部署只需要 data/ 底下那兩個現用檔案）。daily_download.py
+# 也已加上保留天數上限，本機也不會無限長大。
+data/history/
 
 # Python
 __pycache__/

@@ -1,6 +1,7 @@
 """
 每日自動下載美股/台股清單，覆蓋 data/uslist.xlsx、data/twlist.xlsx，
-並把當天下載到的資料另存一份到 data/history/ 留存歷史記錄。
+並把當天下載到的資料另存一份到 data/history/ 留存歷史記錄（純本機稽核用途，
+不會進 git；只保留最近 HISTORY_RETENTION_DAYS 天，執行時自動清掉更舊的）。
 
 複用 setup_login.py 存下的登入狀態 (auth_state.json)，不需要每次重新登入。
 如果 session 已經過期（被導回登入頁），會印出訊息並以非 0 狀態碼結束，
@@ -32,6 +33,12 @@ DATA_DIR = REPO_DIR / "data"
 HISTORY_DIR = DATA_DIR / "history"
 DOWNLOAD_URL = "https://stocks.ddns.net/App/DownloadList.aspx"
 
+# data/history/ 現在已從 git 排除（純本機留存，見 .gitignore 的說明），不會
+# 再讓 Public repo 隨時間無限長大，但本機磁碟還是會累積（一天約 2.5MB）。
+# 保留最近這麼多天的備份，超過的自動刪除，避免本機也無限長大；只是留存稽核
+# 用途的每日快照，不是唯一資料來源，砍掉舊的不影響任何功能。
+HISTORY_RETENTION_DAYS = 30
+
 # (下載頁面上的按鈕 id, 存檔檔名, 驗證用的工作表名稱)
 TARGETS = [
     ("ctl00_ContentPlaceHolder1_Export", "uslist.xlsx", "US"),       # 美股
@@ -55,6 +62,27 @@ def verify_xlsx(path: Path, expected_sheet: str) -> bool:
     except Exception as e:
         log(f"  驗證失敗: {e}")
         return False
+
+
+def cleanup_old_history(retention_days: int = HISTORY_RETENTION_DAYS) -> None:
+    """刪除 data/history/ 裡超過保留天數的備份檔，避免本機無限累積。
+
+    只刪 history 目錄底下的檔案，不動 data/twlist.xlsx、data/uslist.xlsx
+    這兩個現用資料本體。刪除失敗（例如檔案被其他程式鎖住）只記錄 log，
+    不讓整支下載腳本失敗——這只是清理步驟，不影響當天下載到的資料已經
+    成功寫入的事實。
+    """
+    if not HISTORY_DIR.exists():
+        return
+    cutoff = datetime.datetime.now() - datetime.timedelta(days=retention_days)
+    for f in HISTORY_DIR.glob("*.xlsx"):
+        try:
+            mtime = datetime.datetime.fromtimestamp(f.stat().st_mtime)
+            if mtime < cutoff:
+                f.unlink()
+                log(f"  已清除逾 {retention_days} 天的舊備份: {f.name}")
+        except OSError as e:
+            log(f"  清除舊備份失敗（略過，不影響本次下載結果）: {f.name} - {e}")
 
 
 def git_sync(today_str: str) -> None:
@@ -138,6 +166,8 @@ def main() -> int:
             any_updated = True
 
         browser.close()
+
+    cleanup_old_history()
 
     if any_updated:
         git_sync(today_str)

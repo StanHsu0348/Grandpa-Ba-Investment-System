@@ -51,6 +51,25 @@ def filter_by_roe(df: pd.DataFrame, threshold: float, mode: str = "strict") -> p
     raise ValueError(f"未知的 ROE 篩選模式：{mode}")
 
 
+def roe_row_passes(row: pd.Series, threshold: float, mode: str = "strict") -> Optional[bool]:
+    """單一列版本的原則①判準，供個股詳細卡片的逐項檢核使用。
+
+    直接複用 filter_by_roe()（把單列包成 1 列 DataFrame 傳進去），而不是
+    另外用「預期ROE」這個單一數字跟門檻比較。兩者是完全不同的判準來源：
+    filter_by_roe() 看的是 ROE1~ROE5（近5年實際歷史值）＋模式（嚴格版／
+    平均版），「預期ROE」則是對未來一年的估計值。曾經卡片用後者、側邊欄
+    篩選用前者，導致同一檔股票在「篩選結果表」與「個股詳細卡片」上①的
+    ✅／❌結論會互相矛盾（實測台股門檻15%嚴格版：144家通過篩選中有13家
+    卡片顯示❌；230家沒通過篩選卻在卡片顯示✅）。統一呼叫這裡後，
+    卡片顯示的①一定跟篩選結果一致。
+
+    threshold<=0 視為不限，回傳 None（呼叫端應顯示為「⚠️ 不適用」）。
+    """
+    if threshold <= 0:
+        return None
+    return len(filter_by_roe(pd.DataFrame([row]), threshold, mode)) == 1
+
+
 def filter_by_payout(df: pd.DataFrame, threshold: float) -> pd.DataFrame:
     """原則②：配息率 >= 門檻。threshold=0 視為不限（不過濾缺值以外的資料）。"""
     if threshold <= 0:
