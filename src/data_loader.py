@@ -79,6 +79,17 @@ def load_tw_data(path_or_buffer) -> pd.DataFrame:
             "找不到必要欄位：" + "、".join(f"『{c}』" for c in missing) + "，請確認檔案格式。"
         )
 
+    # uslist.xlsx 剛好也具備 REQUIRED_COLUMNS 的全部欄位（同一套工具產生，
+    # 美股清單只是「多」欄位），單靠「缺欄位就擋」不夠，會讓台股頁悄悄吃下
+    # 美股清單、用台股口徑（市值單位億元台幣、MOPS 查證連結…）算出一堆
+    # 錯誤數字卻不報錯。用美股清單獨有欄位反向擋下。
+    us_only_cols = [c for c in ("Industry", "COUNTRY", "市值($m)") if c in df.columns]
+    if us_only_cols:
+        raise DataLoadError(
+            "這個檔案看起來是美股清單（含" + "、".join(f"『{c}』" for c in us_only_cols)
+            + "欄位），請改在美股頁面上傳，或確認檔案格式。"
+        )
+
     df = df.copy()
 
     # SECTOR 欄位補齊空白清理（保留缺值為 NaN，不轉成字串 "nan"）
@@ -181,11 +192,36 @@ def load_us_data(path_or_buffer) -> pd.DataFrame:
 
 
 def get_data_date(df: pd.DataFrame) -> str:
-    """回傳資料日期（收盤日欄位最大值），格式化為 YYYY-MM-DD 字串。"""
-    if "收盤日" not in df.columns or df["收盤日"].dropna().empty:
+    """回傳資料日期（收盤日欄位最大值），格式化為 YYYY-MM-DD 字串。
+
+    「收盤日」欄位不在 NUMERIC_COLUMNS 裡強制轉型，保留 pd.read_excel 讀出來
+    的原始型別，實務上看過／可能遇到的樣態包括：數字 20260826（目前
+    twlist.xlsx／uslist.xlsx 的格式）、pandas Timestamp（儲存格若設成 Excel
+    日期格式，會直接讀成 datetime，例如美股清單裡就混著這種列，見
+    uslist.xlsx 抽樣資料）、或字串 "2026-08-26"。原本的 int(max_date) 對
+    Timestamp／字串都會直接拋 TypeError／ValueError，讓整頁噴原生
+    traceback；這裡的資料日期只是輔助顯示，不值得為了格式意外讓整頁掛掉，
+    所以改成逐型別判斷＋保底 try/except，失敗一律回傳「未知」。
+    """
+    if "收盤日" not in df.columns:
         return "未知"
-    max_date = int(df["收盤日"].dropna().max())
-    date_str = str(max_date)
-    if len(date_str) == 8:
+    values = df["收盤日"].dropna()
+    if values.empty:
+        return "未知"
+
+    try:
+        max_date = values.max()
+    except TypeError:
+        return "未知"
+
+    if hasattr(max_date, "strftime"):  # pandas Timestamp / datetime.date 等
+        return max_date.strftime("%Y-%m-%d")
+
+    try:
+        date_str = str(int(max_date)) if isinstance(max_date, (int, float)) else str(max_date).strip()
+    except (TypeError, ValueError):
+        return "未知"
+
+    if len(date_str) == 8 and date_str.isdigit():
         return f"{date_str[0:4]}-{date_str[4:6]}-{date_str[6:8]}"
-    return date_str
+    return date_str or "未知"

@@ -10,9 +10,7 @@ import io
 import os
 
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 
 from src.constants import (
     COVERAGE_AUTO_ITEMS,
@@ -21,7 +19,6 @@ from src.constants import (
     DEFAULT_IRR_THRESHOLD_US,
     DEFAULT_MARKET_CAP_THRESHOLD_US,
     DEFAULT_NET_INCOME_THRESHOLD_US,
-    DEFAULT_PAYOUT_THRESHOLD_US,
     DEFAULT_ROE_THRESHOLD_US,
     IRR_QUICK_OPTIONS_US,
     IRR_SLIDER_MAX,
@@ -34,7 +31,8 @@ from src.constants import (
     YAHOO_FINANCE_URL_TEMPLATE,
 )
 from src.data_loader import DataLoadError, get_data_date, load_us_data
-from src.scoring import compute_coverage_score, compute_roe_stability
+from src.detail_card import DetailCardSpec, render_stock_detail
+from src.scoring import compute_coverage_score
 from src.screener import (
     ROE_FILTER_MODE_LABELS,
     ROE_FILTER_MODES,
@@ -42,7 +40,13 @@ from src.screener import (
     filter_by_roe,
     valuation_labels,
 )
-from src.ui_helpers import synced_slider
+from src.ui_helpers import (
+    init_two_level_sector_state,
+    render_download_buttons,
+    scroll_to_anchor,
+    sync_two_level_sector_state,
+    synced_slider,
+)
 from src.us_sector_i18n import (
     US_SECTOR_GROUPS,
     format_group_option,
@@ -55,40 +59,53 @@ DATA_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "uslist.xlsx"
 )
 
+# 個股詳細卡片市場專屬設定（見 src/detail_card.py 的 DetailCardSpec、
+# render_stock_detail()：兩個市場共用同一份渲染邏輯，這裡只放「真正不同」
+# 的部分，例如市值欄位命名、門檻數字、查證連結、同業比較分組依據）。
+#
+# market_cap_value_fmt／peer 表頭的市值文字原本分別寫成「USD {v:.1f}M」與
+# 「{v:.1f} 百萬美元」兩種不同措辭（同一支 render_stock_detail() 裡就不一致），
+# 統一成共用函式後兩處自然變成同一套措辭（USD 格式），純文字表達方式調整，
+# 數字與判斷邏輯不受影響。
+US_DETAIL_CARD_SPEC = DetailCardSpec(
+    market_cap_col="市值($m)",
+    market_cap_display_label="市值($M)",
+    market_cap_threshold=DEFAULT_MARKET_CAP_THRESHOLD_US,
+    market_cap_value_fmt=lambda v: f"USD {v:.1f}M",
+    market_cap_threshold_fmt=lambda v: f"USD {v:.0f}M",
+    irr_threshold=DEFAULT_IRR_THRESHOLD_US,
+    verify_url_template=YAHOO_FINANCE_URL_TEMPLATE,
+    verify_button_label="前往 Yahoo Finance 查證 ④⑤",
+    peer_group_col="Industry",
+    peer_missing_caption="此公司無細分產業（Industry）資料，無法進行同業比較。",
+    peer_header_fn=lambda row, total: f"{row['Industry']}（Industry，共 {total} 家，依市值排序）",
+    sector_check_text_fn=lambda row: (
+        f"Sector「{us_translate(row['SECTOR'])}（{row['SECTOR']}）」／"
+        f"Industry「{row['Industry'] if pd.notna(row['Industry']) else '—'}」"
+    ) if pd.notna(row["SECTOR"]) else (
+        f"Sector「—」／Industry「{row['Industry'] if pd.notna(row['Industry']) else '—'}」"
+    ),
+    ownership_check_label="內部人（董監）持股",
+    # 營收與淨利一樣是各公司原始財報幣別的數值，故標註「財報幣別」。
+    revenue_unit_fn=lambda row: f"百萬（{row['財報幣別']}）" if pd.notna(row.get("財報幣別")) else "百萬",
+    peer_extra_column_builder=lambda peers: peers,  # 財報幣別／預期常利已是原始欄位，不需額外計算
+    peer_extra_show_cols={"財報幣別": "財報幣別", "預期常利": "淨利(百萬,原幣)"},
+    peer_extra_column_config={"淨利(百萬,原幣)": st.column_config.NumberColumn(format="%.1f")},
+    page_top_anchor="us-page-top",
+)
+
 
 # ---------------------------------------------------------------------------
 # 資料載入（含快取）
 # ---------------------------------------------------------------------------
-@st.cache_data(show_spinner="讀取資料中…")
+@st.cache_data(show_spinner="讀取資料中…", max_entries=2)
 def _load_from_path(path: str, mtime: float) -> pd.DataFrame:
     return load_us_data(path)
 
 
-@st.cache_data(show_spinner="讀取資料中…")
+@st.cache_data(show_spinner="讀取資料中…", max_entries=2)
 def _load_from_bytes(file_bytes: bytes) -> pd.DataFrame:
     return load_us_data(io.BytesIO(file_bytes))
-
-
-@st.cache_data(show_spinner=False)
-def _to_csv_bytes(table: pd.DataFrame) -> bytes:
-    return table.to_csv(index=False).encode("utf-8-sig")
-
-
-@st.cache_data(show_spinner=False)
-def _to_excel_bytes(table: pd.DataFrame) -> bytes:
-    """把篩選結果表轉成 Excel bytes，供下載按鈕使用。
-
-    這裡加上 @st.cache_data 是因為 st.download_button 每次 script rerun
-    都要重新取得 data= 參數（哪怕使用者根本沒按下載），而 ExcelWriter
-    對上萬列資料的寫入成本不小（實測美股 12,497 列約 2 秒），
-    不快取的話等於每次調整任何篩選條件都要白白付這筆成本。
-    快取鍵是 table 本身的內容雜湊，篩選結果不變時直接吃快取。
-    傳入的 table 需為欄位皆為純量值的版本（可直接寫入 Excel）。
-    """
-    excel_buffer = io.BytesIO()
-    with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-        table.to_excel(writer, index=False, sheet_name="篩選結果")
-    return excel_buffer.getvalue()
 
 
 def init_session_defaults():
@@ -101,6 +118,7 @@ def init_session_defaults():
         "us_net_income_threshold": 0.0,
         "us_sector_groups": None,  # None 代表尚未依資料初始化
         "us_sectors": None,  # None 代表尚未依資料初始化
+        "_us_prev_sector_groups": None,  # 用於偵測「新勾選的大分類」，見下方細分產業還原邏輯
         "us_currencies": None,  # None 代表尚未依資料初始化
         "us_valuation_mode": "any",
         "us_irr_threshold_slider": IRR_SLIDER_MIN,
@@ -128,141 +146,11 @@ def clear_all_filters(all_sectors, all_currencies):
     st.session_state["us_net_income_threshold"] = 0.0
     st.session_state["us_sector_groups"] = list(US_SECTOR_GROUPS.keys())
     st.session_state["us_sectors"] = list(all_sectors)
+    st.session_state["_us_prev_sector_groups"] = list(US_SECTOR_GROUPS.keys())
     st.session_state["us_currencies"] = list(all_currencies)
     st.session_state["us_valuation_mode"] = "any"
     st.session_state["us_irr_threshold_slider"] = IRR_SLIDER_MIN
     st.session_state["us_irr_threshold_input"] = IRR_SLIDER_MIN
-
-
-def render_stock_detail(row: pd.Series, df: pd.DataFrame, roe_threshold: float, key_prefix: str) -> None:
-    """渲染單一股票的詳細卡片：5年 ROE 趨勢圖、五點原則逐項檢核、同業比較。
-
-    df 為完整資料集（不受目前篩選條件影響），用於同業比較；
-    key_prefix 用於區隔不同呼叫端產生的 widget key（例如快速查詢 vs 篩選結果選單），
-    避免同一次 script run 中出現重複的 widget key。
-    """
-    detail_cols = st.columns([1, 1])
-
-    with detail_cols[0], st.container(border=True):
-        years_old_to_new = list(reversed(ROE_COLS_RECENT_TO_OLD))
-        roe_values = [row[c] for c in years_old_to_new]
-        fig = go.Figure()
-        fig.add_trace(
-            go.Scatter(
-                x=ROE_YEAR_LABELS_OLD_TO_NEW,
-                y=roe_values,
-                mode="lines+markers",
-                name="ROE(%)",
-            )
-        )
-        fig.add_hline(y=roe_threshold, line_dash="dash", line_color="gray",
-                       annotation_text=f"門檻 {roe_threshold}%")
-        fig.update_layout(title=f"{row['COMPANY']} 5年 ROE 趨勢", yaxis_title="ROE (%)", height=350)
-        st.plotly_chart(fig, width="stretch", key=f"{key_prefix}_roe_chart")
-
-        stability = compute_roe_stability(row)
-        st.caption(
-            f"標準差：{stability['std']:.2f}　"
-            f"趨勢分類：{stability['trend_label']}　"
-            f"可用年數：{stability['n_years']}/5"
-            if pd.notna(stability["std"])
-            else f"趨勢分類：{stability['trend_label']}"
-        )
-
-    with detail_cols[1], st.container(border=True):
-        st.markdown("**五點原則逐項檢核**")
-        roe_ok = None if pd.isna(row["預期ROE"]) or roe_threshold <= 0 else row["預期ROE"] >= roe_threshold
-        payout_ok = row["預期配息率"] >= DEFAULT_PAYOUT_THRESHOLD_US
-        market_cap_ok = None if pd.isna(row["市值($m)"]) else row["市值($m)"] >= DEFAULT_MARKET_CAP_THRESHOLD_US
-
-        def mark(ok):
-            if ok is None:
-                return "⚠️"
-            return "✅" if ok else "❌"
-
-        roe_text = "—（無資料）" if pd.isna(row["預期ROE"]) else f"{row['預期ROE']:.2f}%"
-        roe_history_text = " / ".join(
-            "—" if pd.isna(row[c]) else f"{row[c]:.1f}%" for c in ROE_COLS_RECENT_TO_OLD
-        )
-        st.markdown(
-            f"- {mark(roe_ok)} ①ROE穩定：預期ROE {roe_text}（門檻 {roe_threshold}%）　"
-            f"｜　歷年ROE(近→遠) {roe_history_text}"
-        )
-        retention_text = "—" if pd.isna(row["盈再率"]) else f"{row['盈再率']:.2f}%"
-        st.markdown(
-            f"- {mark(payout_ok)} ②配得出現金：配息率 {row['預期配息率']:.2f}%"
-            f"（課程門檻 {DEFAULT_PAYOUT_THRESHOLD_US}%），盈再率 {retention_text}"
-        )
-        sector_display = f"{us_translate(row['SECTOR'])}（{row['SECTOR']}）" if pd.notna(row["SECTOR"]) else "—"
-        industry_display = row["Industry"] if pd.notna(row["Industry"]) else "—"
-        st.markdown(
-            f"- ⚠️ ③不會變的公司：Sector「{sector_display}」／Industry「{industry_display}」，請自行判斷"
-        )
-        # 注意：st.markdown 會把「$…$」解讀成 LaTeX 數學公式語法，兩個裸的
-        # 錢字號同一行會讓中間文字被吃掉、跑出奇怪的等寬字樣式，因此這裡
-        # 跟著本檔案其他地方（例如淨利門檻說明）的慣例改用「USD」文字，
-        # 不直接輸出「$」符號。
-        market_cap_text = "—（無資料）" if pd.isna(row["市值($m)"]) else f"USD {row['市值($m)']:.1f}M"
-        st.markdown(
-            f"- {mark(market_cap_ok)} ④公司夠大：市值 {market_cap_text}"
-            f"（門檻 USD {DEFAULT_MARKET_CAP_THRESHOLD_US:.0f}M），上市年資 ❌ 待查證"
-        )
-        st.markdown("- ❌ ⑤老闆誠信：內部人（董監）持股 待查證")
-
-        irr_text = "—（無法估算）" if pd.isna(row["預期報酬率"]) else f"{row['預期報酬率']:.1f}%"
-        irr_ok = None if pd.isna(row["預期報酬率"]) else row["預期報酬率"] >= DEFAULT_IRR_THRESHOLD_US
-        st.markdown(
-            f"- {mark(irr_ok)} 延伸判準：預期報酬率(IRR) {irr_text}"
-            f"（課程門檻 ≥{DEFAULT_IRR_THRESHOLD_US:.0f}%）"
-        )
-
-        yahoo_url = YAHOO_FINANCE_URL_TEMPLATE.format(symbol=row["Symbol"])
-        st.link_button("前往 Yahoo Finance 查證 ④⑤", yahoo_url, key=f"{key_prefix}_yahoo_link")
-
-    st.divider()
-    if pd.isna(row["Industry"]):
-        st.caption("此公司無細分產業（Industry）資料，無法進行同業比較。")
-    else:
-        with st.container(border=True):
-            peers = df[df["Industry"] == row["Industry"]].copy()
-            peers = peers.sort_values("市值($m)", ascending=False, na_position="last").reset_index(drop=True)
-            peers.insert(0, "排名", peers.index + 1)
-            peers["本股"] = peers["Symbol"].apply(lambda s: "👉" if s == row["Symbol"] else "")
-
-            my_rank_rows = peers.index[peers["Symbol"] == row["Symbol"]]
-            my_rank = int(my_rank_rows[0]) + 1 if len(my_rank_rows) else None
-            total_peers = len(peers)
-
-            st.markdown(f"**同業比較 — {row['Industry']}（Industry，共 {total_peers} 家，依市值排序）**")
-            if my_rank and pd.notna(row["市值($m)"]):
-                st.caption(f"{row['COMPANY']} 市值約 {row['市值($m)']:.1f} 百萬美元，同業市值排名第 {my_rank}/{total_peers} 名")
-
-            peer_show_cols = {
-                "本股": "本股",
-                "排名": "排名",
-                "Symbol": "股票代號",
-                "COMPANY": "公司名稱",
-                "市值($m)": "市值($M)",
-                "預期ROE": "預期ROE(%)",
-                "預期配息率": "配息率(%)",
-                "預期常利": "淨利(百萬,原幣)",
-            }
-            peer_table = peers[list(peer_show_cols.keys())].rename(columns=peer_show_cols)
-            st.dataframe(
-                peer_table,
-                width="stretch",
-                hide_index=True,
-                height=350,
-                key=f"{key_prefix}_peer_table",
-                column_config={
-                    "市值($M)": st.column_config.NumberColumn(format="%.1f"),
-                    "預期ROE(%)": st.column_config.NumberColumn(format="%.2f"),
-                    "配息率(%)": st.column_config.NumberColumn(format="%.2f"),
-                    "淨利(百萬,原幣)": st.column_config.NumberColumn(format="%.1f"),
-                },
-            )
-
-    st.markdown("[⬆️ 回到最上方](#us-page-top)")
 
 
 init_session_defaults()
@@ -390,8 +278,7 @@ st.sidebar.caption(
 )
 
 us_group_keys = list(US_SECTOR_GROUPS.keys())
-if st.session_state["us_sector_groups"] is None:
-    st.session_state["us_sector_groups"] = list(us_group_keys)
+init_two_level_sector_state("us_sector_groups", "us_sectors", "_us_prev_sector_groups", us_group_keys)
 
 selected_sector_groups = st.sidebar.multiselect(
     "產業大分類",
@@ -404,13 +291,13 @@ sectors_in_groups = sorted(
     [s for s in all_sectors if us_group_of(s) in selected_sector_groups],
     key=us_translate,
 )
-
-if st.session_state["us_sectors"] is None:
-    st.session_state["us_sectors"] = list(sectors_in_groups)
-else:
-    # 大分類縮小範圍後，先前選的細分產業若已不在範圍內就移除，
-    # 避免 multiselect 的 value 超出 options 而噴錯。
-    st.session_state["us_sectors"] = [s for s in st.session_state["us_sectors"] if s in sectors_in_groups]
+# 大分類縮小範圍後，先前選的細分產業若已不在範圍內就移除；大分類「新增」範圍
+# 時，新出現的細分產業預設一併勾選。細節與修正前的 bug 見
+# src/ui_helpers.py 的 sync_two_level_sector_state()。
+sync_two_level_sector_state(
+    selected_sector_groups, "us_sectors", "_us_prev_sector_groups", sectors_in_groups, us_group_of,
+    sort_key=us_translate,
+)
 
 if not selected_sector_groups:
     st.sidebar.caption("⚠️ 尚未選擇任何產業大分類，下方細分產業清單為空、篩選結果將是 0 家。")
@@ -533,7 +420,7 @@ with tab_search:
             if search_picked:
                 search_symbol = search_picked.split("　")[0]
                 search_row = df[df["Symbol"] == search_symbol].iloc[0]
-                render_stock_detail(search_row, df, roe_threshold, key_prefix="us_search")
+                render_stock_detail(search_row, df, roe_threshold, roe_mode, payout_threshold, key_prefix="us_search", spec=US_DETAIL_CARD_SPEC)
 
 with tab_screen:
     # -----------------------------------------------------------------
@@ -612,24 +499,11 @@ with tab_screen:
             st.session_state["us_detail_symbol"] = result_df.iloc[selected_rows[0]]["Symbol"]
             st.session_state["_us_scroll_to_detail"] = True
 
-        # -------------------------------------------------------------
-        # 下載按鈕
-        #
         # table 現在每欄都已經是純量值（5年ROE已展開成獨立數字欄位），
-        # CSV／Excel 直接共用同一份表格即可，欄位自然一致。
-        # -------------------------------------------------------------
-        dl_cols = st.columns(2)
-        dl_cols[0].download_button(
-            "⬇️ 下載 CSV", data=_to_csv_bytes(table), file_name="us_screener_result.csv", mime="text/csv",
-            key="us_dl_csv",
-        )
-        dl_cols[1].download_button(
-            "⬇️ 下載 Excel",
-            data=_to_excel_bytes(table),
-            file_name="us_screener_result.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="us_dl_xlsx",
-        )
+        # CSV／Excel 直接共用同一份表格即可，欄位自然一致。下載按鈕邏輯
+        # （含 Excel 延後產生、內容雜湊防抓到舊檔案）見 src/ui_helpers.py
+        # 的 render_download_buttons()。
+        render_download_buttons(table, key_prefix="us", file_stem="us_screener_result")
 
         st.divider()
 
@@ -640,18 +514,7 @@ with tab_screen:
         st.subheader("個股詳細檢視")
 
         if st.session_state.pop("_us_scroll_to_detail", False):
-            components.html(
-                """
-                <script>
-                    setTimeout(function () {
-                        const doc = window.parent.document;
-                        const el = doc.getElementById('us-detail-section');
-                        if (el) { el.scrollIntoView({behavior: 'smooth', block: 'start'}); }
-                    }, 150);
-                </script>
-                """,
-                height=0,
-            )
+            scroll_to_anchor("us-detail-section")
         symbol_options = (result_df["Symbol"] + "　" + result_df["COMPANY"]).tolist()
 
         # 刻意不對這個 selectbox 使用 key（見 views/tw.py 同一位置的詳細註解）：
@@ -669,4 +532,4 @@ with tab_screen:
             picked_symbol = picked.split("　")[0]
             st.session_state["us_detail_symbol"] = picked_symbol
             row = result_df[result_df["Symbol"] == picked_symbol].iloc[0]
-            render_stock_detail(row, df, roe_threshold, key_prefix="us")
+            render_stock_detail(row, df, roe_threshold, roe_mode, payout_threshold, key_prefix="us", spec=US_DETAIL_CARD_SPEC)
