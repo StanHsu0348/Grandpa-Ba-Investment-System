@@ -58,6 +58,7 @@ TW_DETAIL_CARD_SPEC = DetailCardSpec(
     market_cap_threshold=DEFAULT_MARKET_CAP_THRESHOLD,
     market_cap_value_fmt=lambda v: f"{v:.1f} 億元",
     market_cap_threshold_fmt=lambda v: f"{v:.0f} 億元",
+    price_fmt=lambda v: f"{v:,.2f} 元",
     irr_threshold=DEFAULT_IRR_THRESHOLD,
     verify_url_template=MOPS_URL_TEMPLATE,
     verify_button_label="前往公開資訊觀測站查證 ④⑤",
@@ -407,17 +408,19 @@ with tab_screen:
 
         display_df["估價區間"] = valuation_labels(display_df)
 
+        # 欄位順序：股票代號 → 股票名稱 → IRR → 歷年ROE（近5年實際值）→ 市值 放最前面
+        # （使用者指定的重點欄位），其餘欄位接在後面。
         show_cols = {
             "Symbol": "股票代號",
             "COMPANY": "公司名稱",
-            "SECTOR": "產業",
-            "市值(億)": "市值(億)",
-            "預期ROE": "預期ROE(%)",
+            "預期報酬率": "預期報酬率IRR(%)",
             **{c: c for c in roe_year_cols},
+            "市值(億)": "市值(億)",
+            "SECTOR": "產業",
+            "預期ROE": "預期ROE(%)",
             "預期配息率": "配息率(%)",
             "淨利(億)": "淨利(億)",
             "估價區間": "估價區間",
-            "預期報酬率": "預期報酬率IRR(%)",
             "五點覆蓋度": "五點覆蓋度",
         }
         table = display_df[list(show_cols.keys())].rename(columns=show_cols)

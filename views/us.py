@@ -73,6 +73,7 @@ US_DETAIL_CARD_SPEC = DetailCardSpec(
     market_cap_threshold=DEFAULT_MARKET_CAP_THRESHOLD_US,
     market_cap_value_fmt=lambda v: f"USD {v:.1f}M",
     market_cap_threshold_fmt=lambda v: f"USD {v:.0f}M",
+    price_fmt=lambda v: f"USD {v:,.2f}",
     irr_threshold=DEFAULT_IRR_THRESHOLD_US,
     verify_url_template=YAHOO_FINANCE_URL_TEMPLATE,
     verify_button_label="前往 Yahoo Finance 查證 ④⑤",
@@ -458,21 +459,23 @@ with tab_screen:
             lambda s: us_translate(s) if pd.notna(s) else s
         )
 
+        # 欄位順序：股票代號 → 股票名稱 → IRR → 歷年ROE（近5年實際值）→ 市值 放最前面
+        # （使用者指定的重點欄位），其餘欄位接在後面。
         show_cols = {
             "Symbol": "股票代號",
             "COMPANY": "公司名稱",
+            "預期報酬率": "預期報酬率IRR(%)",
+            **{c: c for c in roe_year_cols},
+            "市值($m)": "市值($M)",
             "COUNTRY": "國家",
             "產業(中文)": "產業(中文)",
             "SECTOR": "產業(English)",
             "Industry": "細分產業(Industry)",
             "財報幣別": "財報幣別",
-            "市值($m)": "市值($M)",
             "預期ROE": "預期ROE(%)",
-            **{c: c for c in roe_year_cols},
             "預期配息率": "配息率(%)",
             "預期常利": "淨利(百萬,原幣)",
             "估價區間": "估價區間",
-            "預期報酬率": "預期報酬率IRR(%)",
             "五點覆蓋度": "五點覆蓋度",
         }
         table = display_df[list(show_cols.keys())].rename(columns=show_cols)

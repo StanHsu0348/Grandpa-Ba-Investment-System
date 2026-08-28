@@ -22,7 +22,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from .constants import ROE_COLS_RECENT_TO_OLD, ROE_YEAR_LABELS_OLD_TO_NEW
-from .screener import ROE_FILTER_MODE_LABELS, roe_row_passes
+from .screener import ROE_FILTER_MODE_LABELS, roe_row_passes, valuation_labels
 from .scoring import compute_roe_stability
 
 
@@ -37,6 +37,8 @@ class DetailCardSpec:
     market_cap_threshold: float                       # DEFAULT_MARKET_CAP_THRESHOLD(_US)
     market_cap_value_fmt: Callable[[float], str]       # 市值數字 -> 顯示文字，例如 "50.0 億元"
     market_cap_threshold_fmt: Callable[[float], str]   # 市值門檻 -> 顯示文字，例如 "50 億元"
+    price_fmt: Callable[[float], str]                  # 股價數字（收盤價／貴價／淑價）-> 顯示文字，
+                                                        # 例如台股 "123.50 元"、美股 "USD 123.50"
     irr_threshold: float                               # DEFAULT_IRR_THRESHOLD(_US)
     verify_url_template: str                           # MOPS_URL_TEMPLATE 或 YAHOO_FINANCE_URL_TEMPLATE
     verify_button_label: str                           # 查證連結按鈕文字
@@ -80,10 +82,25 @@ def render_stock_detail(
     irr_raw = row["預期報酬率"]
     irr_value_text = "—" if pd.isna(irr_raw) else f"{irr_raw:.1f}%"
 
+    # 估價區間（貴價／淑價）：貴價＝評估的「昂貴價」上緣，淑價＝評估的
+    # 「便宜價（淑女價）」下緣，收盤價落在哪一區間由 valuation_labels()
+    # 判定（與側邊欄「加分：估價區間篩選」共用同一套邏輯）。
+    close_raw = row.get("收盤價")
+    expensive_price_raw = row.get("貴價")
+    cheap_price_raw = row.get("淑價")
+    valuation_label = valuation_labels(pd.DataFrame([row])).iloc[0]
+
+    def _price_text(v):
+        return "—" if pd.isna(v) else spec.price_fmt(v)
+
     st.markdown(f"**{row['Symbol']}　{row['COMPANY']}**")
     st.caption(
         f"交易所：{exchange_text}　｜　最新財報期別：{report_text}　｜　"
         f"最近年度營收：{revenue_text}　｜　預期報酬率(IRR)：{irr_value_text}"
+    )
+    st.caption(
+        f"收盤價：{_price_text(close_raw)}　｜　貴價（昂貴價）：{_price_text(expensive_price_raw)}"
+        f"　｜　淑價（便宜價）：{_price_text(cheap_price_raw)}　｜　目前估價區間：{valuation_label}"
     )
 
     detail_cols = st.columns([1, 1])
