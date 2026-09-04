@@ -1,0 +1,5 @@
+# 統一換行為 LF，避免跨作業系統（Windows/macOS）產生整檔假差異
+* text=auto eol=lf
+
+# 二進位檔不做任何轉換
+*.xlsx binary
