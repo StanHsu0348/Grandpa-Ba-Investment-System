@@ -121,7 +121,10 @@ def render_stock_detail(
             fig.add_hline(y=roe_threshold, line_dash="dash", line_color="gray",
                            annotation_text=f"門檻 {roe_threshold}%")
         fig.update_layout(title=f"{row['COMPANY']} 5年 ROE 趨勢", yaxis_title="ROE (%)", height=350)
-        st.plotly_chart(fig, width="stretch", key=f"{key_prefix}_roe_chart")
+        # plotly_chart 沒有 width 參數（dataframe 才有），傳了會落入 **kwargs 被當成
+        # Plotly config，觸發 deprecation 警告且未來版本會移除。滿版是 use_container_width
+        # 的預設行為，不必特別指定。
+        st.plotly_chart(fig, key=f"{key_prefix}_roe_chart")
 
         stability = compute_roe_stability(row)
         st.caption(
