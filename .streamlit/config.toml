@@ -1,3 +1,13 @@
+# ---------------------------------------------------------------------------
+# Apple 風格視覺 — 白色卡片＋淺灰畫布，仿 Apple Stocks / 系統設定 App 的雙層視覺
+#
+# 注意 Streamlit 的主題設定「沒有」分模式的寫法：不存在 [theme.light] /
+# [theme.dark] 這種區塊（1.50 為止皆然，設了會在啟動時印出
+# "not a valid config option" 警告並整段忽略）。色票只有一組，寫在 [theme]
+# 底下，由 base 決定要以淺色還是深色為基底。因此這裡採用淺色單一模式。
+#
+# 側邊欄可以用 [theme.sidebar] 覆寫，做出「側欄白、主畫布灰」的層次。
+# ---------------------------------------------------------------------------
 [theme]
 base = "light"
 font = "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang TC', 'Microsoft JhengHei', Arial, sans-serif"
@@ -7,12 +17,8 @@ baseRadius = "1rem"
 buttonRadius = "full"
 showWidgetBorder = false
 showSidebarBorder = true
-metricValueFontWeight = 700
 
-# ---------------------------------------------------------------------------
-# 淺色模式 — 白色畫布＋淺灰卡片背景，仿 Apple Stocks / 系統設定 App 的雙層視覺
-# ---------------------------------------------------------------------------
-[theme.light]
+# 色票（原 [theme.light] 區塊，提升到 [theme] 才會實際生效）
 primaryColor = "#0071e3"
 backgroundColor = "#f5f5f7"
 secondaryBackgroundColor = "#ffffff"
@@ -26,29 +32,7 @@ blueColor = "#0071e3"
 dataframeBorderColor = "#d2d2d7"
 dataframeHeaderBackgroundColor = "#f5f5f7"
 
-[theme.light.sidebar]
+[theme.sidebar]
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f5f5f7"
 borderColor = "#d2d2d7"
-
-# ---------------------------------------------------------------------------
-# 深色模式 — 對應 macOS/iOS 深色模式慣用色票
-# ---------------------------------------------------------------------------
-[theme.dark]
-primaryColor = "#0a84ff"
-backgroundColor = "#1c1c1e"
-secondaryBackgroundColor = "#2c2c2e"
-textColor = "#f5f5f7"
-borderColor = "#38383a"
-linkColor = "#0a84ff"
-redColor = "#ff453a"
-orangeColor = "#ff9f0a"
-greenColor = "#30d158"
-blueColor = "#0a84ff"
-dataframeBorderColor = "#38383a"
-dataframeHeaderBackgroundColor = "#2c2c2e"
-
-[theme.dark.sidebar]
-backgroundColor = "#000000"
-secondaryBackgroundColor = "#1c1c1e"
-borderColor = "#38383a"
