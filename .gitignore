@@ -25,6 +25,8 @@ scripts/stocks_download/button_labels.txt
 data/history/
 
 # Python
+.venv/
+venv/
 __pycache__/
 *.pyc
 .pytest_cache/
