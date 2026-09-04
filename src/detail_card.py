@@ -180,7 +180,8 @@ def render_stock_detail(
         )
 
         verify_url = spec.verify_url_template.format(symbol=row["Symbol"])
-        st.link_button(spec.verify_button_label, verify_url, key=f"{key_prefix}_verify_link")
+        # 注意：link_button 是無狀態元件，Streamlit 沒有給它 key 參數（傳了會 TypeError）
+        st.link_button(spec.verify_button_label, verify_url)
 
     st.divider()
     if pd.isna(row[spec.peer_group_col]):
