@@ -31,6 +31,7 @@ from src.constants import (
     YAHOO_FINANCE_URL_TEMPLATE,
 )
 from src.data_loader import DataLoadError, get_data_date, load_us_data
+from src.theme import render_hero, render_principles
 from src.detail_card import DetailCardSpec, render_stock_detail
 from src.scoring import compute_coverage_score
 from src.screener import (
@@ -160,8 +161,8 @@ init_session_defaults()
 # ---------------------------------------------------------------------------
 # 側邊欄：資料來源
 # ---------------------------------------------------------------------------
-st.sidebar.header("📁 資料來源（美股）")
-uploaded_file = st.sidebar.file_uploader("上傳最新股票清單 Excel", type=["xlsx"], key="us_uploader")
+with st.sidebar.expander("資料來源 · 美股", expanded=False):
+    uploaded_file = st.file_uploader("上傳最新股票清單 Excel", type=["xlsx"], key="us_uploader")
 
 try:
     if uploaded_file is not None:
@@ -196,62 +197,63 @@ st.sidebar.divider()
 # ---------------------------------------------------------------------------
 # 側邊欄：① ROE 穩定度篩選
 # ---------------------------------------------------------------------------
-st.sidebar.header("① ROE 穩定度篩選")
-st.sidebar.caption(
-    f"近5年（ROE1~ROE5 實際歷史值，非預期ROE）依所選模式與門檻篩選，"
-    f"缺值視為不通過。門檻設為 0 代表不限。（課程門檻參考值：{DEFAULT_ROE_THRESHOLD_US:.0f}%）"
-)
+with st.sidebar.expander("① ROE 穩定度篩選", expanded=True):
+    st.caption(
+        f"近5年（ROE1~ROE5 實際歷史值，非預期ROE）依所選模式與門檻篩選，"
+        f"缺值視為不通過。門檻設為 0 代表不限。（課程門檻參考值：{DEFAULT_ROE_THRESHOLD_US:.0f}%）"
+    )
 
-roe_mode = st.sidebar.radio(
-    "篩選模式",
-    options=ROE_FILTER_MODES,
-    format_func=lambda m: ROE_FILTER_MODE_LABELS[m],
-    key="us_roe_mode",
-)
-roe_threshold = synced_slider("ROE 門檻（%，0=不限）", "us_roe_threshold", 0.0, 40.0, 0.5)
-st.sidebar.caption(f"目前模式與門檻下符合 {len(filter_by_roe(df, roe_threshold, roe_mode)):,} 家")
-st.sidebar.caption("⚠️ ROE1~ROE5 的「近→遠」順序沿用台股清單的假設，尚未針對美股個別驗證，僅供參考。")
+    roe_mode = st.radio(
+        "篩選模式",
+        options=ROE_FILTER_MODES,
+        format_func=lambda m: ROE_FILTER_MODE_LABELS[m],
+        key="us_roe_mode",
+    )
+    roe_threshold = synced_slider("ROE 門檻（%，0=不限）", "us_roe_threshold", 0.0, 40.0, 0.5, container=st)
+    st.caption(f"目前模式與門檻下符合 {len(filter_by_roe(df, roe_threshold, roe_mode)):,} 家")
+    st.caption("⚠️ ROE1~ROE5 的「近→遠」順序沿用台股清單的假設，尚未針對美股個別驗證，僅供參考。")
 
 st.sidebar.divider()
 
 # ---------------------------------------------------------------------------
 # 側邊欄：② 配息率篩選
 # ---------------------------------------------------------------------------
-st.sidebar.header("② 配息率篩選")
-payout_cols = st.sidebar.columns(len(PAYOUT_QUICK_OPTIONS_US))
-for col, (label, value) in zip(payout_cols, PAYOUT_QUICK_OPTIONS_US.items()):
-    if col.button(label, key=f"us_payout_quick_{label}"):
-        st.session_state["us_payout_threshold_slider"] = value
-        st.session_state["us_payout_threshold_input"] = value
+with st.sidebar.expander("② 配息率篩選", expanded=False):
+    payout_cols = st.columns(len(PAYOUT_QUICK_OPTIONS_US))
+    for col, (label, value) in zip(payout_cols, PAYOUT_QUICK_OPTIONS_US.items()):
+        if col.button(label, key=f"us_payout_quick_{label}"):
+            st.session_state["us_payout_threshold_slider"] = value
+            st.session_state["us_payout_threshold_input"] = value
 
-payout_threshold = synced_slider("配息率門檻（%，0=不限）", "us_payout_threshold", 0.0, 100.0, 1.0)
+    payout_threshold = synced_slider("配息率門檻（%，0=不限）", "us_payout_threshold", 0.0, 100.0, 1.0, container=st)
 
 st.sidebar.divider()
 
 # ---------------------------------------------------------------------------
 # 側邊欄：④ 淨利門檻
 # ---------------------------------------------------------------------------
-st.sidebar.header("④ 淨利門檻（公司夠大）")
-st.sidebar.caption(
-    f"美股改用課程附錄「稅前淨利國際級 > USD {DEFAULT_NET_INCOME_THRESHOLD_US:.0f}M」延伸判準，"
-    "而非台股的 5 億元台幣門檻。"
-)
-net_income_cols = st.sidebar.columns(len(NET_INCOME_QUICK_OPTIONS_US))
-for col, (label, value) in zip(net_income_cols, NET_INCOME_QUICK_OPTIONS_US.items()):
-    if col.button(label, key=f"us_ni_quick_{label}"):
-        st.session_state["us_net_income_threshold"] = value
+with st.sidebar.expander("④ 淨利門檻（公司夠大）", expanded=False):
+    st.caption(
+        f"美股改用課程附錄「稅前淨利國際級 > USD {DEFAULT_NET_INCOME_THRESHOLD_US:.0f}M」延伸判準，"
+        "而非台股的 5 億元台幣門檻。"
+    )
+    net_income_cols = st.columns(len(NET_INCOME_QUICK_OPTIONS_US))
+    for col, (label, value) in zip(net_income_cols, NET_INCOME_QUICK_OPTIONS_US.items()):
+        if col.button(label, key=f"us_ni_quick_{label}"):
+            st.session_state["us_net_income_threshold"] = value
 
-net_income_threshold = st.sidebar.number_input(
-    "淨利門檻（百萬元，依財報幣別，0=不限）", min_value=0.0, step=25.0, key="us_net_income_threshold"
-)
+    net_income_threshold = st.number_input(
+        "淨利門檻（百萬元，依財報幣別，0=不限）", min_value=0.0, step=25.0, key="us_net_income_threshold"
+    )
 
-st.sidebar.caption("「上市滿 2 年」資料中無此欄位，不做篩選，請自行查證。")
+    st.caption("「上市滿 2 年」資料中無此欄位，不做篩選，請自行查證。")
+
 st.sidebar.divider()
 
 # ---------------------------------------------------------------------------
 # 側邊欄：延伸判準 — 預期報酬率（IRR）（非五點原則本身，預設收合）
 # ---------------------------------------------------------------------------
-with st.sidebar.expander("🎯 延伸判準：預期報酬率（IRR）", expanded=False):
+with st.sidebar.expander("進階條件 · 預期報酬率（IRR）", expanded=False):
     st.caption(
         f"對應課程 Ch6「合理買價報酬率」概念，課程延伸判準為 IRR ≥ {DEFAULT_IRR_THRESHOLD_US:.0f}%。"
         "滑到最左（不限）時不套用；套用時，無法估算 IRR 的公司會被排除。"
@@ -272,59 +274,59 @@ st.sidebar.divider()
 # ---------------------------------------------------------------------------
 # 側邊欄：③ 產業類別
 # ---------------------------------------------------------------------------
-st.sidebar.header("③ 產業類別（SECTOR）")
-st.sidebar.caption(
-    "預設全選；產業本身無法自動判斷是否「不易變」，請自行判斷。"
-    "美股原始 SECTOR 有 200 多種英文分類，已加上中文翻譯並歸成大分類，"
-    "先選「產業大分類」縮小範圍，再從下方細分產業清單挑選會更好選。"
-)
+with st.sidebar.expander("③ 產業類別（SECTOR）", expanded=False):
+    st.caption(
+        "預設全選；產業本身無法自動判斷是否「不易變」，請自行判斷。"
+        "美股原始 SECTOR 有 200 多種英文分類，已加上中文翻譯並歸成大分類，"
+        "先選「產業大分類」縮小範圍，再從下方細分產業清單挑選會更好選。"
+    )
 
-us_group_keys = list(US_SECTOR_GROUPS.keys())
-init_two_level_sector_state("us_sector_groups", "us_sectors", "_us_prev_sector_groups", us_group_keys)
+    us_group_keys = list(US_SECTOR_GROUPS.keys())
+    init_two_level_sector_state("us_sector_groups", "us_sectors", "_us_prev_sector_groups", us_group_keys)
 
-selected_sector_groups = st.sidebar.multiselect(
-    "產業大分類",
-    options=us_group_keys,
-    format_func=format_group_option,
-    key="us_sector_groups",
-)
+    selected_sector_groups = st.multiselect(
+        "產業大分類",
+        options=us_group_keys,
+        format_func=format_group_option,
+        key="us_sector_groups",
+    )
 
-sectors_in_groups = sorted(
-    [s for s in all_sectors if us_group_of(s) in selected_sector_groups],
-    key=us_translate,
-)
-# 大分類縮小範圍後，先前選的細分產業若已不在範圍內就移除；大分類「新增」範圍
-# 時，新出現的細分產業預設一併勾選。細節與修正前的 bug 見
-# src/ui_helpers.py 的 sync_two_level_sector_state()。
-sync_two_level_sector_state(
-    selected_sector_groups, "us_sectors", "_us_prev_sector_groups", sectors_in_groups, us_group_of,
-    sort_key=us_translate,
-)
+    sectors_in_groups = sorted(
+        [s for s in all_sectors if us_group_of(s) in selected_sector_groups],
+        key=us_translate,
+    )
+    # 大分類縮小範圍後，先前選的細分產業若已不在範圍內就移除；大分類「新增」範圍
+    # 時，新出現的細分產業預設一併勾選。細節與修正前的 bug 見
+    # src/ui_helpers.py 的 sync_two_level_sector_state()。
+    sync_two_level_sector_state(
+        selected_sector_groups, "us_sectors", "_us_prev_sector_groups", sectors_in_groups, us_group_of,
+        sort_key=us_translate,
+    )
 
-if not selected_sector_groups:
-    st.sidebar.caption("⚠️ 尚未選擇任何產業大分類，下方細分產業清單為空、篩選結果將是 0 家。")
+    if not selected_sector_groups:
+        st.caption("⚠️ 尚未選擇任何產業大分類，下方細分產業清單為空、篩選結果將是 0 家。")
 
-selected_sectors = st.sidebar.multiselect(
-    "細分產業（中文／English）", options=sectors_in_groups, format_func=format_sector_option, key="us_sectors"
-)
+    selected_sectors = st.multiselect(
+        "細分產業（中文／English）", options=sectors_in_groups, format_func=format_sector_option, key="us_sectors"
+    )
 
 st.sidebar.divider()
 
 # ---------------------------------------------------------------------------
 # 側邊欄：財報幣別（美股專屬，因跨國掛牌／ADR 幣別不一）
 # ---------------------------------------------------------------------------
-st.sidebar.header("財報幣別")
-st.sidebar.caption(CURRENCY_CAVEAT_NOTE)
-selected_currencies = st.sidebar.multiselect(
-    "選擇財報幣別", options=all_currencies, key="us_currencies"
-)
+with st.sidebar.expander("財報幣別", expanded=False):
+    st.caption(CURRENCY_CAVEAT_NOTE)
+    selected_currencies = st.multiselect(
+        "選擇財報幣別", options=all_currencies, key="us_currencies"
+    )
 
 st.sidebar.divider()
 
 # ---------------------------------------------------------------------------
 # 側邊欄：加分項 — 估價區間（非五點原則本身，預設收合）
 # ---------------------------------------------------------------------------
-with st.sidebar.expander("💰 加分：估價區間篩選", expanded=False):
+with st.sidebar.expander("進階條件 · 估價區間", expanded=False):
     valuation_mode = st.radio(
         "目前價格區間",
         options=["any", "cheap", "fair", "expensive"],
@@ -338,7 +340,7 @@ with st.sidebar.expander("💰 加分：估價區間篩選", expanded=False):
     )
 
 st.sidebar.divider()
-if st.sidebar.button("🔄 清空所有篩選", key="us_clear_filters_btn"):
+if st.sidebar.button("重設為不限", key="us_clear_filters_btn"):
     st.session_state["_us_clear_filters_pending"] = True
     st.rerun()
 
@@ -370,9 +372,9 @@ if currencies_for_filter is not None:
 # ---------------------------------------------------------------------------
 # 主畫面：標題與已知限制
 # ---------------------------------------------------------------------------
-st.title("🗽 巴爺爺選股 — 美股｜五點好企業原則篩選系統")
+render_hero("美股", data_date, len(df), len(result_df))
 st.markdown('<div id="us-page-top"></div>', unsafe_allow_html=True)
-with st.expander("⚠️ 已知限制（請詳閱）", expanded=False):
+with st.expander("資料說明與需要人工查證的項目", expanded=False):
     st.markdown(
         f"""
 - 本系統**只能自動判斷五點原則中的 ①②④（淨利部分）**，共 {COVERAGE_AUTO_ITEMS}/{COVERAGE_TOTAL} 項。
@@ -393,16 +395,19 @@ with st.expander("⚠️ 已知限制（請詳閱）", expanded=False):
 # 分頁可以讓兩種使用情境（「我要查一檔特定股票」vs「我要瀏覽篩選出的清單」）
 # 各自佔一個獨立畫面，互不干擾。
 # ---------------------------------------------------------------------------
-tab_search, tab_screen, tab_irr_ranking = st.tabs(
-    ["🔍 快速查詢股票", "📊 篩選結果與個股詳情", "🏆 IRR 排行"]
+tab_screen, tab_search, tab_irr_ranking = st.tabs(
+    ["企業篩選", "個股研究", "IRR 排行"]
 )
 
 with tab_search:
+    st.subheader("從一家你想了解的企業開始。")
     st.caption("輸入股票代號或公司名稱（支援部分比對，僅比對英文原文），可直接看到該股票的資料，不受篩選條件影響。")
     us_search_query = st.text_input(
         "股票代號或名稱", key="us_search_query", placeholder="例如：AAPL 或 Apple",
         label_visibility="collapsed",
     )
+    if not us_search_query.strip():
+        render_principles()
     if us_search_query.strip():
         q = us_search_query.strip()
         search_mask = (
@@ -446,10 +451,11 @@ with tab_screen:
     # -----------------------------------------------------------------
     # 結果表格
     # -----------------------------------------------------------------
-    st.subheader("篩選結果")
+    st.subheader("值得進一步研究的企業")
+    st.caption("在側欄調整條件，結果即時更新。選取表格中的企業，查看完整分析。")
 
     if len(result_df) == 0:
-        st.info("目前條件下沒有符合的股票，請調整篩選條件。")
+        st.info("目前沒有符合全部條件的企業。試著降低 ROE、配息率或淨利門檻，或按側欄「重設為不限」重新開始。")
     else:
         display_df = result_df.copy()
         display_df["五點覆蓋度"] = display_df.apply(compute_coverage_score, axis=1)

@@ -93,14 +93,23 @@ def render_stock_detail(
     def _price_text(v):
         return "—" if pd.isna(v) else spec.price_fmt(v)
 
-    st.markdown(f"**{row['Symbol']}　{row['COMPANY']}**")
+    st.subheader(f"{row['Symbol']}　{row['COMPANY']}")
     st.caption(
         f"交易所：{exchange_text}　｜　最新財報期別：{report_text}　｜　"
         f"最近年度營收：{revenue_text}　｜　預期報酬率(IRR)：{irr_value_text}"
     )
+    summary_cols = st.columns(3)
+    for column, label, value in zip(
+        summary_cols,
+        ("收盤價", "預期報酬率 · IRR", "預期 ROE"),
+        (_price_text(close_raw), irr_value_text,
+         "—" if pd.isna(row["預期ROE"]) else f"{row['預期ROE']:.2f}%"),
+    ):
+        with column, st.container(border=True):
+            st.metric(label, value)
     st.caption(
-        f"收盤價：{_price_text(close_raw)}　｜　貴價（昂貴價）：{_price_text(expensive_price_raw)}"
-        f"　｜　淑價（便宜價）：{_price_text(cheap_price_raw)}　｜　目前估價區間：{valuation_label}"
+        f"目前估價區間：{valuation_label}　｜　淑價（便宜價）：{_price_text(cheap_price_raw)}"
+        f"　｜　貴價（昂貴價）：{_price_text(expensive_price_raw)}"
     )
 
     detail_cols = st.columns([1, 1])
@@ -115,12 +124,18 @@ def render_stock_detail(
                 y=roe_values,
                 mode="lines+markers",
                 name="ROE(%)",
+                line=dict(color="#34805b", width=3),
+                marker=dict(size=7),
+                fill="tozeroy", fillcolor="rgba(52,128,91,0.07)",
             )
         )
         if roe_threshold > 0:  # 門檻=0 代表不限，不畫一條沒有意義的「門檻 0%」虛線
             fig.add_hline(y=roe_threshold, line_dash="dash", line_color="gray",
                            annotation_text=f"門檻 {roe_threshold}%")
-        fig.update_layout(title=f"{row['COMPANY']} 5年 ROE 趨勢", yaxis_title="ROE (%)", height=350)
+        fig.update_layout(title=f"{row['COMPANY']} 5年 ROE 趨勢", yaxis_title="ROE (%)", height=350,
+                          margin=dict(l=16, r=16, t=55, b=20),
+                          paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                          font=dict(family="-apple-system, sans-serif"))
         # plotly_chart 沒有 width 參數（dataframe 才有），傳了會落入 **kwargs 被當成
         # Plotly config，觸發 deprecation 警告且未來版本會移除。滿版是 use_container_width
         # 的預設行為，不必特別指定。

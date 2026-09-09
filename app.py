@@ -9,7 +9,7 @@ import hmac
 
 import streamlit as st
 
-from src.theme import apply_theme
+from src.theme import apply_theme, render_brand, render_principles
 
 st.set_page_config(page_title="巴爺爺選股 — 五點好企業原則篩選系統", layout="wide")
 apply_theme()
@@ -65,11 +65,21 @@ def check_login() -> bool:
         st.error("系統尚未設定登入帳密（auth_username / auth_password 或 [accounts]），請聯絡管理員設定 Secrets。")
         return False
 
-    st.markdown("## 🔒 登入")
-    with st.form("login_form"):
-        username = st.text_input("帳號")
-        password = st.text_input("密碼", type="password")
-        submitted = st.form_submit_button("登入")
+    render_brand()
+    st.markdown('<section class="hero"><div class="eyebrow">A LONG-TERM PERSPECTIVE</div><h1>投資的從容，<br>從看懂一家好公司開始。</h1><p>以巴菲特的價值投資思維為靈感，專注企業品質，耐心看待價格。</p></section>', unsafe_allow_html=True)
+    left, right = st.columns([1, 1], gap="large")
+    with left:
+        st.subheader("歡迎回來")
+        st.caption("登入後，開始探索台股與美股企業。")
+        with st.form("login_form"):
+            username = st.text_input("帳號", placeholder="輸入你的帳號")
+            password = st.text_input("密碼", type="password", placeholder="輸入你的密碼")
+            submitted = st.form_submit_button("登入研究室", type="primary", use_container_width=True)
+    with right:
+        st.markdown("### 好企業，值得細讀。")
+        st.markdown("從歷年獲利到合理估價，讓每一次研究都有清楚的依據。")
+        st.caption("台股與美股研究 · 五點原則檢核 · 同業比較")
+    render_principles()
 
     if submitted:
         # hmac.compare_digest 對非 ASCII 字串（例如中文帳號）會直接拋
@@ -96,7 +106,8 @@ if not check_login():
     st.stop()
 
 with st.sidebar:
-    if st.button("登出"):
+    render_brand()
+    if st.button("登出帳號", use_container_width=True):
         st.session_state.authenticated = False
         st.rerun()
 
@@ -105,3 +116,4 @@ us_page = st.Page("views/us.py", title="美股", icon="🇺🇸")
 
 pg = st.navigation([tw_page, us_page])
 pg.run()
+st.markdown('<footer class="site-footer">巴爺爺選股 · THE PATIENT INVESTOR<br>以價值投資理念為靈感的獨立研究工具，與 Berkshire Hathaway 無隸屬或背書關係。</footer>', unsafe_allow_html=True)
