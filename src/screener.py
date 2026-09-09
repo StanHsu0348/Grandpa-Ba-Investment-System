@@ -169,6 +169,20 @@ def filter_by_irr(df: pd.DataFrame, threshold: Optional[float]) -> pd.DataFrame:
     return df[df["預期報酬率"] >= threshold]
 
 
+def build_irr_ranking(df: pd.DataFrame) -> pd.DataFrame:
+    """回傳可估算 IRR 的股票排行，依 IRR 由高到低、代號由小到大排列。
+
+    排行是市場總覽用途，刻意不套用側邊欄的篩選條件；各市場頁面可共用
+    這份排序規則，避免台股與美股顯示不同的排名結果。
+    """
+    ranking = df.dropna(subset=["預期報酬率"]).copy()
+    ranking = ranking.sort_values(
+        ["預期報酬率", "Symbol"], ascending=[False, True], kind="stable"
+    ).reset_index(drop=True)
+    ranking.insert(0, "IRR排名", ranking.index + 1)
+    return ranking
+
+
 def apply_all_filters(df: pd.DataFrame, params: dict) -> pd.DataFrame:
     """
     串接所有篩選函式。

@@ -32,6 +32,7 @@ from src.screener import (
     ROE_FILTER_MODE_LABELS,
     ROE_FILTER_MODES,
     apply_all_filters,
+    build_irr_ranking,
     filter_by_roe,
     valuation_labels,
 )
@@ -339,7 +340,7 @@ with st.expander("⚠️ 已知限制（請詳閱）", expanded=False):
     )
 
 # ---------------------------------------------------------------------------
-# 主畫面：快速查詢／篩選結果分頁
+# 主畫面：快速查詢／篩選結果／IRR 排行分頁
 #
 # 兩者分開放在不同分頁，是因為快速查詢一旦選到股票就會展開一整張詳細卡片
 # （圖表＋檢核清單＋同業比較表），如果和篩選結果放在同一個直向捲動頁面裡，
@@ -347,7 +348,9 @@ with st.expander("⚠️ 已知限制（請詳閱）", expanded=False):
 # 分頁可以讓兩種使用情境（「我要查一檔特定股票」vs「我要瀏覽篩選出的清單」）
 # 各自佔一個獨立畫面，互不干擾。
 # ---------------------------------------------------------------------------
-tab_search, tab_screen = st.tabs(["🔍 快速查詢股票", "📊 篩選結果與個股詳情"])
+tab_search, tab_screen, tab_irr_ranking = st.tabs(
+    ["🔍 快速查詢股票", "📊 篩選結果與個股詳情", "🏆 IRR 排行"]
+)
 
 with tab_search:
     st.caption("輸入股票代號或公司名稱（支援部分比對），可直接看到該股票的資料，不受篩選條件影響。")
@@ -490,3 +493,47 @@ with tab_screen:
             st.session_state["tw_detail_symbol"] = picked_symbol
             row = result_df[result_df["Symbol"] == picked_symbol].iloc[0]
             render_stock_detail(row, df, roe_threshold, roe_mode, payout_threshold, key_prefix="tw", spec=TW_DETAIL_CARD_SPEC)
+
+with tab_irr_ranking:
+    st.subheader("IRR 排行")
+    st.caption("依全部台股清單中可估算的預期報酬率（IRR）由高到低排列，不受側邊欄篩選條件影響。")
+    irr_ranking = build_irr_ranking(df)
+    if len(irr_ranking) == 0:
+        st.info("目前資料沒有可用的 IRR 資料。")
+    else:
+        irr_ranking["淨利(億)"] = irr_ranking["預期常利"] / 100.0
+        irr_ranking["估價區間"] = valuation_labels(irr_ranking)
+        roe_year_cols = [f"ROE({label})" for label in ROE_YEAR_LABELS_OLD_TO_NEW]
+        irr_ranking[roe_year_cols] = irr_ranking[list(reversed(ROE_COLS_RECENT_TO_OLD))]
+        ranking_cols = {
+            "IRR排名": "排名",
+            "Symbol": "股票代號",
+            "COMPANY": "公司名稱",
+            "預期報酬率": "預期報酬率IRR(%)",
+            **{c: c for c in roe_year_cols},
+            "收盤價": "收盤價",
+            "淑價": "淑價",
+            "貴價": "貴價",
+            "估價區間": "估價區間",
+            "市值(億)": "市值(億)",
+            "SECTOR": "產業",
+            "預期ROE": "預期ROE(%)",
+            "淨利(億)": "淨利(億)",
+        }
+        ranking_table = irr_ranking[list(ranking_cols)].rename(columns=ranking_cols)
+        st.dataframe(
+            ranking_table,
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "預期報酬率IRR(%)": st.column_config.NumberColumn(format="%.1f"),
+                **{c: st.column_config.NumberColumn(format="%.1f") for c in roe_year_cols},
+                "收盤價": st.column_config.NumberColumn(format="%.2f"),
+                "淑價": st.column_config.NumberColumn(format="%.2f"),
+                "貴價": st.column_config.NumberColumn(format="%.2f"),
+                "市值(億)": st.column_config.NumberColumn(format="%.1f"),
+                "預期ROE(%)": st.column_config.NumberColumn(format="%.2f"),
+                "淨利(億)": st.column_config.NumberColumn(format="%.2f"),
+            },
+        )
+        render_download_buttons(ranking_table, key_prefix="tw_irr_ranking", file_stem="tw_irr_ranking")

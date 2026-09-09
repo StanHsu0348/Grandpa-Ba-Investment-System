@@ -15,7 +15,13 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.data_loader import load_tw_data
-from src.screener import filter_by_net_income, filter_by_payout, filter_by_roe, roe_row_passes
+from src.screener import (
+    build_irr_ranking,
+    filter_by_net_income,
+    filter_by_payout,
+    filter_by_roe,
+    roe_row_passes,
+)
 from src.constants import (
     DEFAULT_NET_INCOME_THRESHOLD,
     DEFAULT_PAYOUT_THRESHOLD,
@@ -48,6 +54,21 @@ def get_row(sample: pd.DataFrame, symbol: str) -> pd.Series:
     row = sample[sample["Symbol"] == symbol]
     assert len(row) == 1
     return row.iloc[0]
+
+
+def test_build_irr_ranking_excludes_missing_values_and_sorts_descending():
+    source = pd.DataFrame(
+        {
+            "Symbol": ["BBB", "CCC", "AAA", "MISSING"],
+            "預期報酬率": [12.0, 20.0, 20.0, float("nan")],
+        }
+    )
+
+    ranking = build_irr_ranking(source)
+
+    # 同一 IRR 以代號排序，讓排行在每次重新整理時維持穩定。
+    assert list(ranking["Symbol"]) == ["AAA", "CCC", "BBB"]
+    assert list(ranking["IRR排名"]) == [1, 2, 3]
 
 
 class TestDataLoader:
