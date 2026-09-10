@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from html import escape
 from typing import Callable
 
 import pandas as pd
@@ -24,6 +25,8 @@ import streamlit as st
 from .constants import ROE_COLS_RECENT_TO_OLD, ROE_YEAR_LABELS_OLD_TO_NEW
 from .screener import ROE_FILTER_MODE_LABELS, roe_row_passes, valuation_labels
 from .scoring import compute_roe_stability
+from .research_navigation import select_research_stock
+from .watchlist_ui import render_watchlist_button
 
 
 @dataclass(frozen=True)
@@ -94,6 +97,7 @@ def render_stock_detail(
         return "—" if pd.isna(v) else spec.price_fmt(v)
 
     st.subheader(f"{row['Symbol']}　{row['COMPANY']}")
+    render_watchlist_button(key_prefix.split("_")[0], str(row["Symbol"]), str(row["COMPANY"]), key_prefix)
     st.caption(
         f"交易所：{exchange_text}　｜　最新財報期別：{report_text}　｜　"
         f"最近年度營收：{revenue_text}　｜　預期報酬率(IRR)：{irr_value_text}"
@@ -234,12 +238,17 @@ def render_stock_detail(
                 **spec.peer_extra_show_cols,
             }
             peer_table = peers[list(peer_show_cols.keys())].rename(columns=peer_show_cols)
+            st.caption('點選同業公司所在列，即可切換到該公司的個股研究；原本篩選條件會保留。')
+            peer_key = f"{key_prefix}_peer_table_{row['Symbol']}"
             st.dataframe(
                 peer_table,
                 width="stretch",
                 hide_index=True,
                 height=350,
-                key=f"{key_prefix}_peer_table",
+                key=peer_key,
+                on_select=lambda: select_research_stock(
+                    key_prefix.split('_')[0], peer_key, peers['Symbol'].tolist()),
+                selection_mode="single-row",
                 column_config={
                     spec.market_cap_display_label: st.column_config.NumberColumn(format="%.1f"),
                     "預期ROE(%)": st.column_config.NumberColumn(format="%.2f"),
@@ -248,4 +257,11 @@ def render_stock_detail(
                 },
             )
 
-    st.markdown(f"[⬆️ 回到最上方](#{spec.page_top_anchor})")
+    st.markdown(
+        f'<div class="back-to-top-row"><a class="back-to-top" '
+        f'href="#{escape(spec.page_top_anchor, quote=True)}" target="_self" '
+        'aria-label="回到頁面最上方">'
+        '<span class="back-to-top-icon" aria-hidden="true">↑</span>'
+        '<span>回到最上方</span></a></div>',
+        unsafe_allow_html=True,
+    )

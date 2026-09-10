@@ -1,0 +1,238 @@
+{
+  "02005N100": {
+    "ticker": "ALLY",
+    "sector": "金融"
+  },
+  "025816109": {
+    "ticker": "AXP",
+    "sector": "金融"
+  },
+  "060505104": {
+    "ticker": "BAC",
+    "sector": "金融"
+  },
+  "14040H105": {
+    "ticker": "COF",
+    "sector": "金融"
+  },
+  "47233W109": {
+    "ticker": "JEF",
+    "sector": "金融"
+  },
+  "615369105": {
+    "ticker": "MCO",
+    "sector": "金融"
+  },
+  "H1467J104": {
+    "ticker": "CB",
+    "sector": "金融"
+  },
+  "57636Q104": {
+    "ticker": "MA",
+    "sector": "金融"
+  },
+  "92826C839": {
+    "ticker": "V",
+    "sector": "金融"
+  },
+  "G0403H108": {
+    "ticker": "AON",
+    "sector": "金融"
+  },
+  "172967424": {
+    "ticker": "C",
+    "sector": "金融"
+  },
+  "G6683N103": {
+    "ticker": "NU",
+    "sector": "金融"
+  },
+  "037833100": {
+    "ticker": "AAPL",
+    "sector": "資訊科技"
+  },
+  "92343E102": {
+    "ticker": "VRSN",
+    "sector": "資訊科技"
+  },
+  "02079K107": {
+    "ticker": "GOOG",
+    "sector": "通訊服務"
+  },
+  "02079K305": {
+    "ticker": "GOOGL",
+    "sector": "通訊服務"
+  },
+  "530909100": {
+    "ticker": "LLYVA",
+    "sector": "通訊服務"
+  },
+  "530909308": {
+    "ticker": "LLYVK",
+    "sector": "通訊服務"
+  },
+  "650111107": {
+    "ticker": "NYT",
+    "sector": "通訊服務"
+  },
+  "829933100": {
+    "ticker": "SIRI",
+    "sector": "通訊服務"
+  },
+  "047726302": {
+    "ticker": "BATRK",
+    "sector": "通訊服務"
+  },
+  "16119P108": {
+    "ticker": "CHTR",
+    "sector": "通訊服務"
+  },
+  "531229755": {
+    "ticker": "FWONK",
+    "sector": "通訊服務"
+  },
+  "G9001E102": {
+    "ticker": "LILA",
+    "sector": "通訊服務"
+  },
+  "G9001E128": {
+    "ticker": "LILAK",
+    "sector": "通訊服務"
+  },
+  "531229722": {
+    "ticker": "LLYVK",
+    "sector": "通訊服務"
+  },
+  "531229748": {
+    "ticker": "LLYVA",
+    "sector": "通訊服務"
+  },
+  "531229854": {
+    "ticker": "FWONK",
+    "sector": "通訊服務"
+  },
+  "872590104": {
+    "ticker": "TMUS",
+    "sector": "通訊服務"
+  },
+  "531229789": {
+    "ticker": "LSXMK",
+    "sector": "通訊服務"
+  },
+  "531229813": {
+    "ticker": "LSXMA",
+    "sector": "通訊服務"
+  },
+  "82968B103": {
+    "ticker": "SIRI",
+    "sector": "通訊服務"
+  },
+  "166764100": {
+    "ticker": "CVX",
+    "sector": "能源"
+  },
+  "674599105": {
+    "ticker": "OXY",
+    "sector": "能源"
+  },
+  "191216100": {
+    "ticker": "KO",
+    "sector": "必需消費"
+  },
+  "500754106": {
+    "ticker": "KHC",
+    "sector": "必需消費"
+  },
+  "501044101": {
+    "ticker": "KR",
+    "sector": "必需消費"
+  },
+  "21036P108": {
+    "ticker": "STZ",
+    "sector": "必需消費"
+  },
+  "25243Q205": {
+    "ticker": "DEO",
+    "sector": "必需消費"
+  },
+  "23331A109": {
+    "ticker": "DHI",
+    "sector": "非必需消費"
+  },
+  "526057104": {
+    "ticker": "LEN",
+    "sector": "非必需消費"
+  },
+  "526057302": {
+    "ticker": "LEN.B",
+    "sector": "非必需消費"
+  },
+  "55616P104": {
+    "ticker": "M",
+    "sector": "非必需消費"
+  },
+  "62944T105": {
+    "ticker": "NVR",
+    "sector": "非必需消費"
+  },
+  "023135106": {
+    "ticker": "AMZN",
+    "sector": "非必需消費"
+  },
+  "25754A201": {
+    "ticker": "DPZ",
+    "sector": "非必需消費"
+  },
+  "73278L105": {
+    "ticker": "POOL",
+    "sector": "非必需消費"
+  },
+  "90384S303": {
+    "ticker": "ULTA",
+    "sector": "非必需消費"
+  },
+  "339750101": {
+    "ticker": "FND",
+    "sector": "非必需消費"
+  },
+  "23918K108": {
+    "ticker": "DVA",
+    "sector": "醫療保健"
+  },
+  "91324P102": {
+    "ticker": "UNH",
+    "sector": "醫療保健"
+  },
+  "247361702": {
+    "ticker": "DAL",
+    "sector": "工業"
+  },
+  "422806208": {
+    "ticker": "HEI.A",
+    "sector": "工業"
+  },
+  "G0176J109": {
+    "ticker": "ALLE",
+    "sector": "工業"
+  },
+  "546347105": {
+    "ticker": "LPX",
+    "sector": "原物料"
+  },
+  "670346105": {
+    "ticker": "NUE",
+    "sector": "原物料"
+  },
+  "512816109": {
+    "ticker": "LAMR",
+    "sector": "不動產"
+  },
+  "78462F103": {
+    "ticker": "SPY",
+    "sector": "指數型基金"
+  },
+  "922908363": {
+    "ticker": "VOO",
+    "sector": "指數型基金"
+  }
+}

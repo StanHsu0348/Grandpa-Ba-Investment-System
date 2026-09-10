@@ -33,6 +33,7 @@ from src.constants import (
 from src.data_loader import DataLoadError, get_data_date, load_us_data
 from src.theme import render_hero, render_principles
 from src.detail_card import DetailCardSpec, render_stock_detail
+from src.research_navigation import render_research_navigation, select_research_stock
 from src.scoring import compute_coverage_score
 from src.screener import (
     ROE_FILTER_MODE_LABELS,
@@ -372,8 +373,8 @@ if currencies_for_filter is not None:
 # ---------------------------------------------------------------------------
 # 主畫面：標題與已知限制
 # ---------------------------------------------------------------------------
+st.markdown('<div id="us-page-top" tabindex="-1"></div>', unsafe_allow_html=True)
 render_hero("美股", data_date, len(df), len(result_df))
-st.markdown('<div id="us-page-top"></div>', unsafe_allow_html=True)
 with st.expander("資料說明與需要人工查證的項目", expanded=False):
     st.markdown(
         f"""
@@ -395,11 +396,12 @@ with st.expander("資料說明與需要人工查證的項目", expanded=False):
 # 分頁可以讓兩種使用情境（「我要查一檔特定股票」vs「我要瀏覽篩選出的清單」）
 # 各自佔一個獨立畫面，互不干擾。
 # ---------------------------------------------------------------------------
-tab_screen, tab_search, tab_irr_ranking = st.tabs(
-    ["企業篩選", "個股研究", "IRR 排行"]
-)
+active_view, incoming_symbol = render_research_navigation("us")
 
-with tab_search:
+if active_view == "個股研究":
+    st.markdown('<div id="us-research-top" tabindex="-1"></div>', unsafe_allow_html=True)
+    if incoming_symbol:
+        scroll_to_anchor('us-research-top')
     st.subheader("從一家你想了解的企業開始。")
     st.caption("輸入股票代號或公司名稱（支援部分比對，僅比對英文原文），可直接看到該股票的資料，不受篩選條件影響。")
     us_search_query = st.text_input(
@@ -414,9 +416,16 @@ with tab_search:
             df["Symbol"].str.contains(q, case=False, na=False, regex=False)
             | df["COMPANY"].str.contains(q, case=False, na=False, regex=False)
         )
-        search_matches = df[search_mask]
+        # Prefer the exact ticker so AAPL cannot land on a partial/name match.
+        # Class-share tickers may use either dots or hyphens in the source list.
+        exact_mask = df["Symbol"].str.upper().str.replace("-", ".", regex=False).eq(q.upper().replace("-", "."))
+        linked_query = q == st.session_state.get("_us_linked_symbol")
+        search_matches = df[exact_mask] if exact_mask.any() or linked_query else df[search_mask]
         if len(search_matches) == 0:
-            st.warning(f"找不到符合「{q}」的股票，請確認代號或名稱是否正確。")
+            if linked_query:
+                st.warning(f"目前美股資料庫尚未收錄「{q}」，無法顯示個股研究。可改查其他股票。")
+            else:
+                st.warning(f"找不到符合「{q}」的股票，請確認代號或名稱是否正確。")
         else:
             if len(search_matches) > 30:
                 st.caption(f"找到 {len(search_matches)} 檔符合，僅顯示前 30 筆，請輸入更精確的關鍵字以縮小範圍。")
@@ -431,7 +440,7 @@ with tab_search:
                 search_row = df[df["Symbol"] == search_symbol].iloc[0]
                 render_stock_detail(search_row, df, roe_threshold, roe_mode, payout_threshold, key_prefix="us_search", spec=US_DETAIL_CARD_SPEC)
 
-with tab_screen:
+if active_view == "企業篩選":
     # -----------------------------------------------------------------
     # 指標卡
     # -----------------------------------------------------------------
@@ -546,7 +555,7 @@ with tab_screen:
             row = result_df[result_df["Symbol"] == picked_symbol].iloc[0]
             render_stock_detail(row, df, roe_threshold, roe_mode, payout_threshold, key_prefix="us", spec=US_DETAIL_CARD_SPEC)
 
-with tab_irr_ranking:
+if active_view == "IRR 排行":
     st.subheader("IRR 排行")
     st.caption("依全部美股清單中可估算的預期報酬率（IRR）由高到低排列，不受側邊欄篩選條件影響。")
     irr_ranking = build_irr_ranking(df)
@@ -578,10 +587,15 @@ with tab_irr_ranking:
             "財報幣別": "財報幣別",
         }
         ranking_table = irr_ranking[list(ranking_cols)].rename(columns=ranking_cols)
+        st.caption("點選股票所在列，即可開啟個股研究；原本篩選條件會保留。")
         st.dataframe(
             ranking_table,
             width="stretch",
             hide_index=True,
+            key="us_irr_ranking_select",
+            on_select=lambda: select_research_stock(
+                "us", "us_irr_ranking_select", irr_ranking["Symbol"].tolist()),
+            selection_mode="single-row",
             column_config={
                 "預期報酬率IRR(%)": st.column_config.NumberColumn(format="%.1f"),
                 **{c: st.column_config.NumberColumn(format="%.1f") for c in roe_year_cols},

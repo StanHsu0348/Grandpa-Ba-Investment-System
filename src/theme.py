@@ -36,6 +36,14 @@ button:focus-visible,a:focus-visible,input:focus-visible {outline:3px solid #a88
 .principle span {font:italic 23px Georgia,serif;color:#9c8554;}
 .principle h3 {font-size:17px;margin:15px 0 8px;padding:0;}
 .principle p {font-size:14px;line-height:1.8;opacity:.7;margin:0;}
+[data-testid="stMain"] {scroll-behavior:smooth;}
+#us-page-top,#tw-page-top {scroll-margin-top:5rem;}
+.back-to-top-row {display:flex;justify-content:flex-end;margin-top:24px;padding-top:20px;border-top:1px solid #7c806530;}
+a.back-to-top,a.back-to-top:visited {display:inline-flex;align-items:center;gap:10px;min-height:48px;padding:0 20px;border:1px solid #7c806540;border-radius:999px;background:rgba(125,130,120,.08);color:inherit;text-decoration:none;font-size:14px;font-weight:600;transition:background .18s ease,box-shadow .18s ease,transform .18s ease;}
+a.back-to-top:hover {color:inherit;text-decoration:none;background:rgba(125,130,120,.16);box-shadow:0 4px 14px #244c3c14;transform:translateY(-2px);}
+a.back-to-top:active {transform:translateY(0);box-shadow:none;}
+a.back-to-top:focus-visible {outline:3px solid #a88547;outline-offset:4px;}
+.back-to-top-icon {display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#244c3c;color:#fff;font-size:18px;line-height:1;}
 .site-footer {margin-top:40px;padding-top:18px;border-top:1px solid #7c806530;font-size:11px;opacity:.65;letter-spacing:.04em;line-height:1.8;}
 @media(max-width:768px) {
  [data-testid="stMainBlockContainer"] {padding:1.5rem 1rem 3rem;}
@@ -53,11 +61,11 @@ def apply_theme() -> None:
 
 
 def render_brand() -> None:
-    st.markdown('<div class="brand"><span class="brand-mark" aria-hidden="true">B.</span><div class="brand-name">巴爺爺選股<small>THE PATIENT INVESTOR</small></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="brand"><span class="brand-mark" aria-hidden="true">B.</span><div class="brand-name">巴爺爺選股<small>GRANDPA BA INVESTOR</small></div></div>', unsafe_allow_html=True)
 
 
 def render_hero(market: str, date: str, total: int, matched: int) -> None:
-    st.markdown(f"""<section class="hero"><div class="eyebrow">THE PATIENT INVESTOR · {escape(market)}研究室</div>
+    st.markdown(f"""<section class="hero"><div class="eyebrow">GRANDPA BA INVESTOR · {escape(market)}研究室</div>
 <h1>發現好企業。<br>讓時間，成為你的優勢。</h1>
 <p>從穩定獲利、現金分配到合理價格，<br>用五點好企業原則，建立自己的長期投資判斷。</p>
 <div class="hero-meta"><span>{escape(market)} · {total:,} 家企業</span><span>{matched:,} 家符合目前篩選</span><span>資料收盤日 {escape(str(date))} · 非即時</span></div>

@@ -1,0 +1,77 @@
+{
+  "reports": [
+    {
+      "period": "2026-06-30",
+      "filed": "2026-08-14",
+      "file": "2026-06-30.xml",
+      "sources": [
+        "https://www.sec.gov/Archives/edgar/data/1067983/000119312526352200/0001193125-26-352200-index.htm"
+      ]
+    },
+    {
+      "period": "2026-03-31",
+      "filed": "2026-05-15",
+      "file": "2026-03-31.xml",
+      "sources": [
+        "https://www.sec.gov/Archives/edgar/data/1067983/000119312526226661/0001193125-26-226661-index.htm"
+      ]
+    },
+    {
+      "period": "2025-12-31",
+      "filed": "2026-02-17",
+      "file": "2025-12-31.xml",
+      "sources": [
+        "https://www.sec.gov/Archives/edgar/data/1067983/000119312526054580/0001193125-26-054580-index.htm"
+      ]
+    },
+    {
+      "period": "2025-09-30",
+      "filed": "2025-11-14",
+      "file": "2025-09-30.xml",
+      "sources": [
+        "https://www.sec.gov/Archives/edgar/data/1067983/000119312525282901/0001193125-25-282901-index.htm"
+      ]
+    },
+    {
+      "period": "2025-06-30",
+      "filed": "2025-08-14",
+      "file": "2025-06-30.xml",
+      "sources": [
+        "https://www.sec.gov/Archives/edgar/data/1067983/000095012325008343/0000950123-25-008343-index.htm"
+      ]
+    },
+    {
+      "period": "2025-03-31",
+      "filed": "2025-08-14",
+      "file": "2025-03-31.xml",
+      "sources": [
+        "https://www.sec.gov/Archives/edgar/data/1067983/000095012325005701/0000950123-25-005701-index.htm",
+        "https://www.sec.gov/Archives/edgar/data/1067983/000095012325008361/0000950123-25-008361-index.htm"
+      ]
+    },
+    {
+      "period": "2024-12-31",
+      "filed": "2025-02-14",
+      "file": "2024-12-31.xml",
+      "sources": [
+        "https://www.sec.gov/Archives/edgar/data/1067983/000095012325002701/0000950123-25-002701-index.htm"
+      ]
+    },
+    {
+      "period": "2024-09-30",
+      "filed": "2024-11-14",
+      "file": "2024-09-30.xml",
+      "sources": [
+        "https://www.sec.gov/Archives/edgar/data/1067983/000095012324011775/0000950123-24-011775-index.htm"
+      ]
+    },
+    {
+      "period": "2024-06-30",
+      "filed": "2024-08-14",
+      "file": "2024-06-30.xml",
+      "sources": [
+        "https://www.sec.gov/Archives/edgar/data/1067983/000095012324008740/0000950123-24-008740-index.htm"
+      ]
+    }
+  ]
+}

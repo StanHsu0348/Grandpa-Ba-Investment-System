@@ -23,7 +23,7 @@ def _load_accounts() -> dict:
       相容性，避免 Streamlit Cloud 上還沒更新成新格式的 Secrets 忽然失效）。
     - 新版多組帳號：[accounts] 區塊，可放任意組數的「帳號 = 密碼」，例如：
         [accounts]
-        Guest = "G@123"
+        example_user = "YOUR_PASSWORD_HERE"
       兩種寫法可以同時存在，行為是「兩邊定義的帳號都能登入」。
 
     st.secrets 在完全沒有 secrets.toml（本機忘了建立、或 Streamlit Cloud
@@ -57,7 +57,7 @@ def check_login() -> bool:
     Secrets、或 key 名稱打錯），一律視為系統設定錯誤、直接擋下，不能讓
     「空帳密」被誤判成密碼比對成功。
     """
-    if st.session_state.get("authenticated"):
+    if st.session_state.get("authenticated") and st.session_state.get("auth_username"):
         return True
 
     accounts = _load_accounts()
@@ -94,6 +94,8 @@ def check_login() -> bool:
                     matched = True
                     break
         if matched:
+            st.session_state.clear()
+            st.session_state.auth_username = username
             st.session_state.authenticated = True
             st.rerun()
         else:
@@ -108,12 +110,16 @@ if not check_login():
 with st.sidebar:
     render_brand()
     if st.button("登出帳號", use_container_width=True):
-        st.session_state.authenticated = False
+        st.session_state.clear()
         st.rerun()
 
 tw_page = st.Page("views/tw.py", title="台股", icon="🇹🇼", default=True)
 us_page = st.Page("views/us.py", title="美股", icon="🇺🇸")
 
-pg = st.navigation([tw_page, us_page])
+berkshire_page = st.Page("views/berkshire.py", title="波克夏持股", icon="🏛️")
+
+watchlist_page = st.Page("views/watchlist.py", title="我的觀察清單", icon="⭐")
+
+pg = st.navigation([tw_page, us_page, berkshire_page, watchlist_page])
 pg.run()
-st.markdown('<footer class="site-footer">巴爺爺選股 · THE PATIENT INVESTOR<br>以價值投資理念為靈感的獨立研究工具，與 Berkshire Hathaway 無隸屬或背書關係。</footer>', unsafe_allow_html=True)
+st.markdown('<footer class="site-footer">巴爺爺選股 · GRANDPA BA INVESTOR<br>以價值投資理念為靈感的獨立研究工具，與 Berkshire Hathaway 無隸屬或背書關係。</footer>', unsafe_allow_html=True)
